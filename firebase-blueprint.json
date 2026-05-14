@@ -1,0 +1,176 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "An item for sale in the eCommerce store.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Display name of the product" },
+        "price": { "type": "number", "description": "Price in numeric format" },
+        "description": { "type": "string", "description": "Detailed product description" },
+        "images": { "type": "array", "description": "List of image URLs" },
+        "category": { "type": "string", "description": "Category slug or ID" },
+        "stock": { "type": "integer", "description": "Number of items in stock" },
+        "featured": { "type": "boolean", "description": "Whether the product is featured on the home page" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "price", "description", "category", "stock"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "A group of related products.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "description": { "type": "string" },
+        "image": { "type": "string" }
+      },
+      "required": ["name", "slug"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile information and roles.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "customer"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A customer purchase.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "items": { "type": "array" },
+        "total": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "processing", "shipped", "delivered", "cancelled"] },
+        "shippingAddress": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "items", "total", "status"]
+    },
+    "Config": {
+      "title": "Config",
+      "description": "Global application configuration.",
+      "type": "object",
+      "properties": {
+        "companyName": { "type": "string" },
+        "logo": { "type": "string" },
+        "heroTitle": { "type": "string" },
+        "heroSubtitle": { "type": "string" },
+        "heroImage": { "type": "string" },
+        "announcement": { "type": "string" }
+      }
+    },
+    "Banner": {
+      "title": "Banner",
+      "description": "Promotional banner for the home or category pages.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "image": { "type": "string" },
+        "link": { "type": "string" },
+        "type": { "type": "string" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["title", "image", "type"]
+    },
+    "Brand": {
+      "title": "Brand",
+      "description": "A product manufacturer or label.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "logo": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "BlogPost": {
+      "title": "Blog Post",
+      "description": "An article or news update.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "author": { "type": "string" },
+        "image": { "type": "string" },
+        "tags": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "content"]
+    },
+    "Coupon": {
+      "title": "Coupon",
+      "description": "Discount code for checkout.",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "discountType": { "type": "string", "enum": ["percentage", "fixed"] },
+        "discountValue": { "type": "number" },
+        "expiryDate": { "type": "string", "format": "date-time" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["code", "discountType", "discountValue"]
+    },
+    "ActivityLog": {
+      "title": "Activity Log",
+      "description": "Admin action log.",
+      "type": "object",
+      "properties": {
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "admin_id": { "type": "string" },
+        "admin_email": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    },
+    "SupportMessage": {
+      "title": "Support Message",
+      "description": "A message sent to customer support.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "message": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "read": { "type": "boolean" }
+      }
+    },
+    "Review": {
+      "title": "Review",
+      "description": "A product review from a customer.",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPhoto": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "images": { "type": "array" },
+        "isVerified": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["productId", "userId", "userName", "rating", "comment", "isVerified"]
+    }
+  },
+  "firestore": {
+    "products": { "schema": "Product", "description": "Main product catalog" },
+    "categories": { "schema": "Category", "description": "Product hierarchy" },
+    "users": { "schema": "User", "description": "User profiles and roles" },
+    "orders": { "schema": "Order", "description": "Customer orders" },
+    "config": { "schema": "Config", "description": "Global site settings" },
+    "support_messages": { "schema": "SupportMessage", "description": "Messages from users/guests" },
+    "reviews": { "schema": "Review", "description": "Customer reviews for products" },
+    "banners": { "schema": "Banner", "description": "Promotional banners" },
+    "brands": { "schema": "Brand", "description": "Associated brands" },
+    "blog_posts": { "schema": "BlogPost", "description": "Blog articles" },
+    "coupons": { "schema": "Coupon", "description": "Discount coupons" },
+    "activity_logs": { "schema": "ActivityLog", "description": "Admin activity history" }
+  }
+}

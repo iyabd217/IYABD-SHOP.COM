@@ -1,0 +1,6 @@
+{
+  "name": "Lumina Luxe",
+  "description": "A premium, mobile-first eCommerce experience for modern curated lifestyle goods, featuring high-performance design and a powerful admin control center.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": []
+}
