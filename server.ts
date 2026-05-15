@@ -14,6 +14,11 @@ import { initializeApp as initClient } from "firebase/app";
 import { getFirestore, collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import firebaseConfig from "./firebase-applet-config.json" assert { type: "json" };
 import admin from 'firebase-admin';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || "";
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 if (!admin.apps.length) {
     admin.initializeApp({
@@ -240,7 +245,22 @@ async function startServer() {
         return `Name: ${d.name}, Price: ${d.price}, Stock: ${d.stock}, Available Sizes: ${d.sizes?.join(', ') || 'N/A'}`;
       }).join("\n");
 
-      let deliverySettings = "Standard delivery takes 2-4 business days inside Dhaka and 4-7 days outside.";
+      // 2. Fetch AI Training from Supabase Storage
+      let aiTraining: any = null;
+      try {
+        const { data: storageData, error } = await supabase.storage
+          .from('support-system')
+          .download('ai-training.json');
+        
+        if (storageData && !error) {
+          const text = await storageData.text();
+          aiTraining = JSON.parse(text);
+        }
+      } catch (e) {
+        console.warn("Could not fetch ai-training.json from Supabase Storage", e);
+      }
+
+      let deliverySettings = aiTraining?.delivery?.time || "Standard delivery takes 2-4 business days inside Dhaka and 4-7 days outside.";
       const supportConfigSnap = await getDocs(query(collection(db, "config"), where("__name__", "==", "support")));
       let supportInfo = "";
       if (!supportConfigSnap.empty) {

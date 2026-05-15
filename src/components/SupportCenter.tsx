@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 import { configService } from '../lib/services';
+import { cmsService } from '../lib/cmsService';
 
 export default function SupportCenter() {
   const { user } = useAuth();
@@ -25,14 +26,43 @@ export default function SupportCenter() {
   // Support Config
   const [config, setConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeEmbed, setActiveEmbed] = useState<string | null>(null);
+  const [fullscreenEmbed, setFullscreenEmbed] = useState<'facebook' | 'tiktok' | 'youtube' | null>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
 
   useEffect(() => {
-    configService.getSupport().then(data => {
-        setConfig(data);
-        setLoading(false);
-    });
+    const initSupport = async () => {
+      const firestoreSupport = await configService.getSupport();
+      const aiTraining = await cmsService.getAiTraining();
+      const socialLinks = await cmsService.getSocialLinks();
+
+      // Merge and update
+      setConfig({
+        ...firestoreSupport,
+        socialLinks,
+        aiTraining
+      });
+
+      // Update welcome message if greeting is found
+      if (aiTraining?.greetings?.welcome) {
+        setChat([{
+          id: 'welcome',
+          from: 'ai',
+          text: aiTraining.greetings.welcome,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }]);
+      } else if (aiTraining?.greetings?.assalamualaikum) {
+        setChat([{
+          id: 'welcome',
+          from: 'ai',
+          text: aiTraining.greetings.assalamualaikum,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }]);
+      }
+
+      setLoading(false);
+    };
+
+    initSupport();
   }, []);
 
   useEffect(() => {
@@ -89,6 +119,70 @@ export default function SupportCenter() {
   const phone = config?.phone || '01719188777';
   const whatsapp = config?.whatsapp || '8801719188777';
   const messengerUrl = config?.messenger || 'https://www.facebook.com/iyabdshop';
+
+  if (fullscreenEmbed) {
+    return (
+      <div className="fixed inset-0 bg-white z-[99999] flex flex-col animate-in slide-in-from-bottom-5 duration-300">
+         <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-white z-10 shrink-0 shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
+            <button 
+               onClick={() => { setFullscreenEmbed(null); setIframeLoaded(false); }}
+               className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-[12px] font-bold text-[14px] transition-colors"
+            >
+               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+               Back
+            </button>
+            <h2 className="font-bold text-[16px] absolute left-1/2 -translate-x-1/2">
+               {fullscreenEmbed === 'facebook' && 'Facebook'}
+               {fullscreenEmbed === 'tiktok' && 'TikTok'}
+               {fullscreenEmbed === 'youtube' && 'YouTube'}
+            </h2>
+            <button 
+               onClick={() => { setFullscreenEmbed(null); setIframeLoaded(false); }}
+               className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors"
+            >
+               <svg className="w-5 h-5 text-slate-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+               </svg>
+            </button>
+         </div>
+         <div className="flex-1 w-full bg-slate-50 relative overflow-hidden flex flex-col">
+            {!iframeLoaded && (
+               <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 backdrop-blur-sm z-10 space-y-3">
+                  <Loader2 className="w-8 h-8 text-slate-400 animate-spin" />
+               </div>
+            )}
+            {fullscreenEmbed === 'facebook' && (
+               <iframe 
+                  src={`https://www.facebook.com/plugins/page.php?href=https%3A%2F%2Fwww.facebook.com%2Fiyabdshop&tabs=timeline&width=500&height=800&small_header=false&adapt_container_width=true&hide_cover=false&show_facepile=true&appId`}
+                  className={`w-full h-full border-none transition-opacity duration-500 ${iframeLoaded ? 'opacity-100' : 'opacity-0'}`}
+                  loading="lazy"
+                  allowFullScreen
+                  allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                  onLoad={() => setIframeLoaded(true)}
+               ></iframe>
+            )}
+            {fullscreenEmbed === 'tiktok' && (
+               <iframe 
+                  src={config?.tiktokUrl || "https://www.tiktok.com/embed/@iyabdshop"}
+                  className={`w-full h-full border-none transition-opacity duration-500 ${iframeLoaded ? 'opacity-100' : 'opacity-0'}`}
+                  loading="lazy"
+                  allowFullScreen
+                  onLoad={() => setIframeLoaded(true)}
+               ></iframe>
+            )}
+            {fullscreenEmbed === 'youtube' && (
+               <iframe 
+                  src="https://www.youtube.com/embed?listType=search&list=IYABD_01"
+                  className={`w-full h-full border-none transition-opacity duration-500 ${iframeLoaded ? 'opacity-100' : 'opacity-0'}`}
+                  loading="lazy"
+                  allowFullScreen
+                  onLoad={() => setIframeLoaded(true)}
+               ></iframe>
+            )}
+         </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#f8f9fa] min-h-screen pb-24 font-sans text-slate-800">
@@ -268,72 +362,73 @@ export default function SupportCenter() {
         </div>
 
         {/* 5. Connect With Us */}
-        <div className="mb-8">
-           <h2 className="text-[14px] font-black tracking-widest uppercase text-slate-400 mb-4 pl-2">Connect With Us</h2>
-           <div className="space-y-3">
-              <a href="https://www.facebook.com/iyabdshop" target="_blank" rel="noreferrer" className="flex items-center gap-4 bg-white p-4 rounded-[16px] border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-md transition-shadow group">
-                 <div className="w-12 h-12 bg-[#1877F2]/10 text-[#1877F2] rounded-2xl flex items-center justify-center">
-                    <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                 </div>
-                 <div className="flex-1">
-                    <h4 className="font-bold text-[15px]">Facebook Page</h4>
-                    <p className="text-slate-500 font-medium text-[13px]">@iyabdshop</p>
-                 </div>
-                 <ExternalLink size={18} className="text-slate-300 group-hover:text-[#1877F2] transition-colors" />
-              </a>
+         <div className="mb-8 overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible sm:pb-0 hide-scrollbar">
+            <h2 className="text-[14px] font-black tracking-widest uppercase text-slate-400 mb-4 pl-2">Connect With Us</h2>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full">
+               
+               <button 
+                  onClick={() => { setFullscreenEmbed('facebook'); setIframeLoaded(false); }}
+                  className="flex-[1_1_31%] bg-white p-[14px] rounded-[20px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] flex items-center justify-between border border-slate-50 hover:shadow-lg transition-all group outline-none h-[64px]"
+               >
+                  <div className="flex items-center gap-3">
+                     <img src="https://upload.wikimedia.org/wikipedia/commons/b/b8/2021_Facebook_icon.svg" alt="Facebook" className="w-[36px] h-[36px] object-contain flex-shrink-0" />
+                     <div className="text-left hidden sm:block">
+                        <h4 className="font-bold text-[14px] text-slate-800 leading-tight">Facebook</h4>
+                        <p className="text-slate-400 font-medium text-[11px] uppercase tracking-wide mt-0.5">@iyabdshop</p>
+                     </div>
+                     <div className="text-left sm:hidden">
+                        <h4 className="font-bold text-[14px] text-slate-800 leading-tight">Facebook</h4>
+                        <p className="text-slate-400 font-medium text-[11px] uppercase tracking-wide mt-0.5">@iyabdshop</p>
+                     </div>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-[#1877F2]/10 transition-colors shrink-0">
+                     <ChevronRight size={16} className="text-slate-400 group-hover:text-[#1877F2]" />
+                  </div>
+               </button>
 
-              <div className="bg-white rounded-[16px] border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.04)] overflow-hidden transition-all duration-300 group">
-                 <button 
-                    onClick={() => {
-                       setActiveEmbed(activeEmbed === 'tiktok' ? null : 'tiktok');
-                       setIframeLoaded(false);
-                    }}
-                    className="w-full flex items-center gap-4 p-4 hover:bg-slate-50 transition-colors text-left outline-none"
-                 >
-                    <div className="w-12 h-12 bg-black text-white rounded-2xl flex items-center justify-center shrink-0">
-                       <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005 15.68a6.34 6.34 0 006.32 6.32c3.55 0 6.32-2.74 6.32-6.19V8.72a8.21 8.21 0 004.36 1.27v-3.4a4.4 4.4 0 01-2.41-.9z"/></svg>
-                    </div>
-                    <div className="flex-1">
-                       <h4 className="font-bold text-[15px]">{config?.tiktokTitle || 'TikTok'}</h4>
-                       <p className="text-slate-500 font-medium text-[13px]">{config?.tiktokUsername || '@iyabdshop'}</p>
-                    </div>
-                    <ChevronRight size={18} className={`text-slate-300 transition-transform duration-300 ${activeEmbed === 'tiktok' ? 'rotate-90 text-black' : 'group-hover:text-black'}`} />
-                 </button>
-                 
-                 {activeEmbed === 'tiktok' && (
-                    <div className="border-t border-slate-100 bg-slate-50 relative w-full h-[500px] sm:h-[600px] overflow-hidden">
-                       {!iframeLoaded && (
-                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50/80 backdrop-blur-sm z-10 space-y-3">
-                             <Loader2 className="w-8 h-8 text-black animate-spin" />
-                             <p className="text-sm font-medium text-slate-500 animate-pulse">Loading amazing videos...</p>
-                          </div>
-                       )}
-                       <iframe 
-                          src={config?.tiktokUrl || "https://www.tiktok.com/embed/@iyabdshop"}
-                          className={`w-full h-full transition-opacity duration-500 ${iframeLoaded ? 'opacity-100' : 'opacity-0'}`}
-                          frameBorder="0"
-                          loading="lazy"
-                          allowFullScreen
-                          onLoad={() => setIframeLoaded(true)}
-                       ></iframe>
-                    </div>
-                 )}
-              </div>
+               <button 
+                  onClick={() => { setFullscreenEmbed('tiktok'); setIframeLoaded(false); }}
+                  className="flex-[1_1_31%] bg-white p-[14px] rounded-[20px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] flex items-center justify-between border border-slate-50 hover:shadow-lg transition-all group outline-none h-[64px]"
+               >
+                  <div className="flex items-center gap-3">
+                     <img src="https://upload.wikimedia.org/wikipedia/commons/3/34/Ionicons_logo-tiktok.svg" alt="TikTok" className="w-[36px] h-[36px] object-contain flex-shrink-0" />
+                     <div className="text-left hidden sm:block">
+                        <h4 className="font-bold text-[14px] text-slate-800 leading-tight">TikTok</h4>
+                        <p className="text-slate-400 font-medium text-[11px] uppercase tracking-wide mt-0.5">@iyabdshop</p>
+                     </div>
+                     <div className="text-left sm:hidden">
+                        <h4 className="font-bold text-[14px] text-slate-800 leading-tight">TikTok</h4>
+                        <p className="text-slate-400 font-medium text-[11px] uppercase tracking-wide mt-0.5">@iyabdshop</p>
+                     </div>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-slate-200 transition-colors shrink-0">
+                     <ChevronRight size={16} className="text-slate-400 group-hover:text-black" />
+                  </div>
+               </button>
 
-              <a href="https://www.youtube.com/@IYABD_01" target="_blank" rel="noreferrer" className="flex items-center gap-4 bg-white p-4 rounded-[16px] border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-md transition-shadow group">
-                 <div className="w-12 h-12 bg-[#FF0000]/10 text-[#FF0000] rounded-2xl flex items-center justify-center">
-                    <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-                 </div>
-                 <div className="flex-1">
-                    <h4 className="font-bold text-[15px]">YouTube</h4>
-                    <p className="text-slate-500 font-medium text-[13px]">@IYABD_01</p>
-                 </div>
-                 <ExternalLink size={18} className="text-slate-300 group-hover:text-[#FF0000] transition-colors" />
-              </a>
-           </div>
-        </div>
+               <button 
+                  onClick={() => { setFullscreenEmbed('youtube'); setIframeLoaded(false); }}
+                  className="flex-[1_1_31%] bg-white p-[14px] rounded-[20px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] flex items-center justify-between border border-slate-50 hover:shadow-lg transition-all group outline-none h-[64px]"
+               >
+                  <div className="flex items-center gap-3">
+                     <img src="https://upload.wikimedia.org/wikipedia/commons/0/09/YouTube_full-color_icon_%282017%29.svg" alt="YouTube" className="w-[36px] h-[36px] object-contain flex-shrink-0" />
+                     <div className="text-left hidden sm:block">
+                        <h4 className="font-bold text-[14px] text-slate-800 leading-tight">YouTube</h4>
+                        <p className="text-slate-400 font-medium text-[11px] uppercase tracking-wide mt-0.5">@IYABD_01</p>
+                     </div>
+                     <div className="text-left sm:hidden">
+                        <h4 className="font-bold text-[14px] text-slate-800 leading-tight">YouTube</h4>
+                        <p className="text-slate-400 font-medium text-[11px] uppercase tracking-wide mt-0.5">@IYABD_01</p>
+                     </div>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-[#FF0000]/10 transition-colors shrink-0">
+                     <ChevronRight size={16} className="text-slate-400 group-hover:text-[#FF0000]" />
+                  </div>
+               </button>
+            </div>
+         </div>
 
-        {/* 6. Office Address */}
+         {/* 6. Office Address */}
         <div className="bg-white rounded-[24px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] border border-slate-100 overflow-hidden relative mb-8">
            <div className="p-6 pb-20">
               <h3 className="font-black text-slate-800 text-[18px] flex items-center gap-2 mb-3">

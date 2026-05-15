@@ -21,6 +21,7 @@ import {
   deleteObject 
 } from 'firebase/storage';
 import { db, auth, storage } from './firebase';
+import { cmsService } from './cmsService';
 
 export enum OperationType {
   CREATE = 'create',
@@ -162,6 +163,24 @@ export const storageService = {
 };
 
 export const productService = {
+  async getAll() {
+    // Try CMS first, then Firestore
+    const cmsProducts = await cmsService.getProducts();
+    if (cmsProducts && cmsProducts.length > 0) {
+      return cmsProducts;
+    }
+
+    const path = 'products';
+    try {
+      const q = query(collection(db, path));
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
   async getById(id: string) {
     const path = `products/${id}`;
     try {
@@ -174,18 +193,6 @@ export const productService = {
     } catch (error) {
       handleFirestoreError(error, OperationType.GET, path);
       return null;
-    }
-  },
-
-  async getAll() {
-    const path = 'products';
-    try {
-      const q = query(collection(db, path));
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, path);
-      return [];
     }
   },
 
@@ -316,6 +323,12 @@ export const brandService = {
 
 export const categoryService = {
   async getAll() {
+    // Try CMS first
+    const cmsCategories = await cmsService.getCategories();
+    if (cmsCategories && cmsCategories.length > 0) {
+      return cmsCategories;
+    }
+
     const path = 'categories';
     try {
       const q = query(collection(db, path));
@@ -343,6 +356,12 @@ export const categoryService = {
 
 export const bannerService = {
   async getAll() {
+    // Try CMS first
+    const cmsBanners = await cmsService.getBanners();
+    if (cmsBanners && cmsBanners.length > 0) {
+      return cmsBanners;
+    }
+
     const path = 'banners';
     try {
       const q = query(collection(db, path));

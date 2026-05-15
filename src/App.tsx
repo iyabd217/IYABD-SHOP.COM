@@ -24,6 +24,7 @@ import 'swiper/css/free-mode';
 import 'swiper/css/effect-fade';
 import { productService, configService, orderService, paymentService, supportService, flashSaleService } from './lib/services';
 import { adminService } from './lib/adminServices';
+import { cmsService } from './lib/cmsService';
 import { Sidebar } from './components/admin/Sidebar';
 import { formatPrice, translations, optimizeImg } from './lib/utils';
 import { CartProvider, useCart } from './lib/cartContext';
@@ -164,9 +165,17 @@ const PageLoader = () => {
          <motion.div 
            animate={{ scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] }}
            transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-           className="w-24 h-24 mb-6 rounded-[24px] bg-gradient-to-tr from-purple-600 via-indigo-600 to-blue-600 shadow-[0_0_40px_rgba(147,51,234,0.3)] flex items-center justify-center"
+           className="w-24 h-24 mb-6 rounded-[24px] bg-white shadow-[0_0_40px_rgba(147,51,234,0.3)] flex items-center justify-center overflow-hidden"
          >
-           <span className="text-white text-3xl font-black uppercase tracking-tighter">IY</span>
+           <img 
+             src={cmsService.getAssetUrl('website-assets', 'logos/logo.png')} 
+             alt="IYABD" 
+             className="w-full h-full object-contain"
+             onError={(e) => {
+               e.currentTarget.style.display = 'none';
+               e.currentTarget.parentElement!.innerHTML = '<span class="text-indigo-600 text-3xl font-black uppercase tracking-tighter">IY</span>';
+             }}
+           />
          </motion.div>
          {/* Custom Spinner */}
          <div className="w-12 h-12 border-4 border-purple-900 border-t-purple-400 rounded-full animate-spin mb-4"></div>
@@ -293,7 +302,7 @@ const BottomNav = () => {
     return null;
   }
 
-  const navItems = [
+  const navItems: { label: string; icon: any; path?: string; isSupport?: boolean; isAction?: boolean; action?: () => void }[] = [
     { label: 'Home', icon: HomeIcon, path: '/' },
     { label: 'Category', icon: LayoutGrid, path: '/categories' },
     { label: 'Deals', icon: DealsIcon, path: '/flash-sale' },

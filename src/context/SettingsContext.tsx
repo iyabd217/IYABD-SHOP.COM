@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { cmsService } from '../lib/cmsService';
 
 export interface SiteSettings {
     logo: string;
@@ -81,6 +82,37 @@ const SettingsContext = createContext<{
 
 export const SettingsProvider = ({ children }: { children: React.ReactNode }) => {
     const [settings, setSettings] = useState<SiteSettings>(defaultSettings);
+
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const cmsHeader = await cmsService.getWebsiteConfig('header.json');
+                const cmsFooter = await cmsService.getWebsiteConfig('footer.json');
+                const cmsSocial = await cmsService.getSocialLinks();
+                const cmsTheme = await cmsService.getWebsiteConfig('theme.json');
+                
+                const logoUrl = cmsService.getAssetUrl('website-assets', 'logos/logo.png');
+
+                setSettings(prev => ({
+                    ...prev,
+                    ...cmsHeader,
+                    ...cmsFooter,
+                    ...cmsSocial,
+                    ...cmsTheme,
+                    logo: logoUrl || prev.logo,
+                    facebook: cmsSocial?.facebook || prev.facebook,
+                    tiktok: cmsSocial?.tiktok || prev.tiktok,
+                    youtube: cmsSocial?.youtube || prev.youtube,
+                    whatsapp: cmsSocial?.whatsapp || prev.whatsapp,
+                }));
+            } catch (err) {
+                console.warn("CMS Settings load failed, using defaults", err);
+            }
+        };
+
+        fetchSettings();
+    }, []);
+
     return (
         <SettingsContext.Provider value={{ settings, setSettings }}>
             {children}
