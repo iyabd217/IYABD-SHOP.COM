@@ -15,10 +15,22 @@ import { getFirestore, collection, query, where, orderBy, getDocs } from "fireba
 import firebaseConfig from "./firebase-applet-config.json" assert { type: "json" };
 import admin from 'firebase-admin';
 import { createClient } from '@supabase/supabase-js';
+import { Resend } from 'resend';
+import { GoogleGenAI } from '@google/genai';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+let resendClient: Resend | null = null;
+function getResend() {
+  if (!resendClient) {
+    if (process.env.RESEND_API_KEY) {
+      resendClient = new Resend(process.env.RESEND_API_KEY);
+    }
+  }
+  return resendClient;
+}
 
 if (!admin.apps.length) {
     admin.initializeApp({
@@ -123,6 +135,27 @@ async function startServer() {
   // Banners API
   app.get("/api/hero-banners", async (req, res) => {
     try {
+      // First try to fetch from Supabase Storage
+      const { data, error } = await supabase.storage.from("product-data").download("banners.json");
+      if (!error && data) {
+         try {
+           const banners = JSON.parse(await data.text());
+           if (Array.isArray(banners) && banners.length > 0) {
+              const heroList = banners.filter(b => b.status && b.type === 'Hero Banner');
+              // Map old format to new if necessary
+              return res.json(heroList.map(b => ({
+                  id: b.id, 
+                  title: b.title, 
+                  subtitle: b.subtitle, 
+                  redirect_url: b.link, 
+                  button_text: "Shop Now",
+                  banner_url: b.image_url || b.image,
+                  is_active: b.status
+              })));
+           }
+         } catch(e) {}
+      }
+
       const q = query(
         collection(db, "hero_banners"), 
         where("is_active", "==", true), 
@@ -444,13 +477,152 @@ Keep answers short and conversational.`;
   app.post("/api/tracking/event", (req, res) => {
     const { eventName, data, timestamp } = req.body;
     console.log(`[CAPI Bridge] Received ${eventName} at ${timestamp}`, data);
-    
-    // In a real implementation, you would:
-    // 1. Fetch marketing settings (Pixel ID, Access Token) from DB
-    // 2. Call Facebook Graph API / TikTok Events API via fetch
-    // example: await fetch(`https://graph.facebook.com/v13.0/${pixelId}/events?access_token=${accessToken}`, ...)
-    
     res.json({ success: true, message: "Event received for server-side processing" });
+  });
+
+  // Resend Email API
+  app.post("/api/email/send", async (req, res) => {
+    const { to, subject, html, text, fromName } = req.body;
+    
+    // Auth check - should only be allowed if admin or user placing order
+    const token = req.headers.authorization?.split(" ")[1] || req.cookies.admin_token;
+    
+    try {
+      const dbRes = await admin.firestore().collection('config').doc('support').get();
+      const supportEmail = dbRes.data()?.email || 'support@iyabd.com';
+      const senderName = fromName || 'IYABD System';
+      const senderAddress = `${senderName} <${supportEmail}>`;
+
+      const resend = getResend();
+      if (!resend) {
+        console.warn("Resend API Key is missing. Simulating email send:", { to, subject });
+        // Simulate email
+        res.json({ id: "simulated_id_" + Date.now(), simulated: true });
+        return;
+      }
+
+      const { data, error } = await resend.emails.send({
+        from: senderAddress,
+        to: Array.isArray(to) ? to : [to],
+        subject,
+        html,
+        text,
+      });
+
+      if (error) {
+        return res.status(400).json({ error });
+      }
+
+      // Log email to Firestore
+      await admin.firestore().collection('customer-emails').add({
+        to,
+        subject,
+        status: 'sent',
+        time: new Date(),
+        gateway: 'resend',
+        gatewayId: data?.id
+      });
+
+      res.status(200).json({ data });
+    } catch (error: any) {
+      console.error("Email send error:", error);
+      
+      await admin.firestore().collection('customer-emails').add({
+        to,
+        subject,
+        status: 'failed',
+        time: new Date(),
+        reason: error.message || 'Unknown'
+      });
+
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+// Move import out of here
+
+  // AI Chat Route
+  app.post("/api/ai/chat", async (req, res) => {
+    try {
+      const { message, history } = req.body;
+      
+      if (!process.env.GEMINI_API_KEY) {
+        return res.status(400).json({ error: "Gemini API key is missing" });
+      }
+
+      // Fetch context data
+      const [storageProducts, storageSupport] = await Promise.all([
+        supabase.storage.from('product-data').download('products.json'),
+        supabase.storage.from('support-system').download('ai-training.json')
+      ]);
+
+      let productsText = "No product data loaded.";
+      if (storageProducts.data) {
+        try {
+            const val = JSON.parse(await storageProducts.data.text());
+            if (Array.isArray(val)) {
+                productsText = val.map(p => `Name: ${p.name}, Price: ${p.price}`).join('\n');
+            }
+        } catch(e) {}
+      }
+
+      let supportConfig: any = {};
+      let deliveryInfo = "Inside Dhaka: 1-2 days. Outside Dhaka: 2-4 days.";
+      if (storageSupport.data) {
+        try {
+            supportConfig = JSON.parse(await storageSupport.data.text());
+            if (supportConfig.delivery?.time) {
+                deliveryInfo = supportConfig.delivery.time;
+            }
+        } catch(e) {}
+      }
+
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      
+      const systemInstruction = `You are a helpful, human-like customer support agent for IYABD Shop.
+      You can understand and reply in both Bengali and English.
+      If a user greets you, reply warmly (e.g. "আসসালামু আলাইকুম 🌸 IYABD Support এ আপনাকে স্বাগতম।").
+      Use emojis.
+
+      Here is our product database information:
+      ${productsText}
+      
+      Delivery Information:
+      ${deliveryInfo}
+      
+      WhatsApp Support: ${supportConfig.whatsapp || '01719188777'}
+
+      Rules:
+      1. ONLY answer questions related to IYABD products, orders, shipping, and refunds.
+      2. Keep answers short and human-like.
+      3. If they ask for a product price, look at the database information. If it's not there, say you will connect them to a human agent.
+      4. DO NOT invent prices or products that are not in the database.
+      `;
+
+      let messages = history || [];
+      const formattedHistory = messages.map((m: any) => ({
+         role: m.from === 'user' ? 'user' : 'model',
+         parts: [{ text: m.text }]
+      }));
+
+      // Add the latest user message
+      formattedHistory.push({ role: 'user', parts: [{ text: message }] });
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: formattedHistory,
+        config: {
+          systemInstruction,
+          temperature: 0.7,
+        }
+      });
+
+      res.json({ reply: response.text });
+
+    } catch (err: any) {
+      console.error("AI Error:", err);
+      res.status(500).json({ error: "Sorry, the AI support is currently experiencing an issue." });
+    }
   });
 
   // Vite middleware for development

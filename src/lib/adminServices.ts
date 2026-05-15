@@ -329,11 +329,62 @@ export const adminService = {
 
   async updateOrder(id: string, updateData: any) {
     const path = `orders/${id}`;
+    let oldOrder = null;
     try {
-      await updateDoc(doc(db, 'orders', id), { ...updateData, updatedAt: serverTimestamp() });
+      const orderRef = doc(db, 'orders', id);
+      const snapshot = await getDoc(orderRef);
+      if (snapshot.exists()) {
+          oldOrder = { id: snapshot.id, ...snapshot.data() };
+      }
+      await updateDoc(orderRef, { ...updateData, updatedAt: serverTimestamp() });
+
+      // Auto Email System for Customer Orders
+      if (oldOrder && updateData.shippingStatus && oldOrder.shippingStatus !== updateData.shippingStatus) {
+         await this.sendOrderStatusEmail(oldOrder, updateData.shippingStatus);
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
     }
+  },
+
+  async sendOrderStatusEmail(order: any, newStatus: string) {
+      if (!order || !order.customerDetails || !order.customerDetails.email) return;
+
+      const email = order.customerDetails.email;
+      let subject = '';
+      let message = '';
+      const orderId = order.id.slice(-6).toUpperCase();
+
+      if (newStatus === 'PROCESSING') {
+          subject = `Your Order #${orderId} is Confirmed`;
+          message = `Hello ${order.customerDetails.name},\n\nYour order #${orderId} has been confirmed. Our team is processing your parcel quickly.\nTotal: ৳${order.total}\n\nThank you for shopping with us!`;
+      } else if (newStatus === 'SENT' || newStatus === 'SHIPPED') {
+          subject = `Your Order #${orderId} is on its way`;
+          message = `Hello ${order.customerDetails.name},\n\nYour order #${orderId} has been handed over to the courier.\nCourier: ${order.courierName || 'Standard'}\nTracking: ${order.trackingId || 'N/A'}\n\nExpected delivery inside Dhaka: 1-2 days, Outside: 2-4 days.`;
+      } else if (newStatus === 'DELIVERED') {
+          subject = `Your Order #${orderId} has been Delivered`;
+          message = `Hello ${order.customerDetails.name},\n\nYour order #${orderId} has been successfully delivered. We hope you enjoy our product!\n\nPlease leave us a review.`;
+      } else if (newStatus === 'CANCELLED') {
+          subject = `Your Order #${orderId} has been Cancelled`;
+          message = `Hello ${order.customerDetails.name},\n\nUnfortunately, your order #${orderId} has been cancelled.\nIf you have already paid, refund process will be initiated shortly.\nPlease contact support for more details.`;
+      }
+
+      if (subject && message) {
+          try {
+              await fetch('/api/email/send', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                      to: email,
+                      subject: subject,
+                      html: `<div style="font-family:sans-serif;color:#333;"><p>${message.replace(/\n/g, '<br/>')}</p></div>`,
+                      text: message
+                  })
+              });
+          } catch(e) {
+              console.error("Failed to send order email:", e);
+          }
+      }
   },
 
   async updateOrderStatus(orderId: string, status: string) {

@@ -41,6 +41,17 @@ export const Sidebar = ({ activeTab, setActiveTab }: any) => {
       ]
     },
     {
+      title: "Customer Messages",
+      items: [
+           { icon: "solar:inbox-line-bold-duotone", label: "All Messages", gradient: "from-blue-600 to-indigo-600" },
+           { icon: "solar:megaphone-bold-duotone", label: "Campaigns", gradient: "from-pink-500 to-rose-500" },
+           { icon: "solar:letter-bold-duotone", label: "Order Emails", gradient: "from-amber-400 to-orange-500" },
+           { icon: "solar:pen-new-round-bold-duotone", label: "Manual Send", gradient: "from-emerald-500 to-teal-600" },
+           { icon: "solar:danger-triangle-bold-duotone", label: "Failed Emails", gradient: "from-red-500 to-rose-600" },
+           { icon: "solar:document-text-bold-duotone", label: "Templates", gradient: "from-purple-500 to-indigo-600" }
+      ]
+    },
+    {
       title: "Main Control",
       items: [
            { icon: "solar:widget-3-bold-duotone", label: "Dashboard", gradient: "from-blue-500 to-cyan-500" },

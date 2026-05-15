@@ -24,6 +24,7 @@ import HelpCenterSettings from './HelpCenterSettings';
 import ManageBanners from './ManageBanners';
 import { FlashSaleManagement } from '../shop/FlashSaleManagement';
 import { AdminSupportCenter } from './AdminSupportCenter';
+import CustomerMessagesManager from './CustomerMessagesManager';
 
 // Placeholder Pages with Real Demo Content
 const SkeletonLoader = () => (
@@ -437,6 +438,13 @@ const AdminDashboard = () => {
                             case 'marketing': return <MarketingCampaigns />;
                             case 'support-center': return <AdminSupportCenter setActiveTab={setActiveTab} />;
                             case 'flash-sale': return <FlashSaleManagement />;
+                            case 'all-messages':
+                            case 'campaigns':
+                            case 'order-emails':
+                            case 'manual-send':
+                            case 'failed-emails':
+                            case 'templates':
+                                return <CustomerMessagesManager activeTab={activeTab} />;
                             case 'banner-slider': return <ManageCategories />;
                             case 'category-banners': return <ManageCategories />;
                             case 'site-settings': return <ShopSettings />;

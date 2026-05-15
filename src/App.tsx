@@ -811,9 +811,15 @@ const YouTubePromoSlider = () => {
   const [banners, setBanners] = useState<any[]>([]);
   
   useEffect(() => {
-    adminService.getBanners().then(all => {
-      const promoBanners = all.filter((b: any) => b.status && b.type === 'YouTube Style');
-      setBanners(promoBanners);
+    cmsService.getBanners().then(cmsBanners => {
+        if (cmsBanners && cmsBanners.length > 0) {
+            setBanners(cmsBanners.filter((b: any) => b.status && b.type === 'YouTube Style'));
+        } else {
+            adminService.getBanners().then(all => {
+              const promoBanners = all.filter((b: any) => b.status && b.type === 'YouTube Style');
+              setBanners(promoBanners);
+            });
+        }
     });
   }, []);
 

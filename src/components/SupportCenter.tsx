@@ -26,6 +26,7 @@ export default function SupportCenter() {
   // Support Config
   const [config, setConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [fullscreenEmbed, setFullscreenEmbed] = useState<'facebook' | 'tiktok' | 'youtube' | null>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
 
@@ -119,6 +120,95 @@ export default function SupportCenter() {
   const phone = config?.phone || '01719188777';
   const whatsapp = config?.whatsapp || '8801719188777';
   const messengerUrl = config?.messenger || 'https://www.facebook.com/iyabdshop';
+
+  if (isChatOpen) {
+    return (
+      <div className="fixed inset-0 bg-slate-50 z-[99999] flex flex-col animate-in slide-in-from-bottom-5 duration-300">
+        <div className="bg-slate-900 p-5 flex items-center justify-between shadow-xl z-20 shrink-0">
+           <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center relative">
+                 <Bot size={24} className="text-white" />
+                 <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-[3px] border-slate-900 rounded-full"></span>
+              </div>
+              <div>
+                 <h3 className="text-white font-bold tracking-widest text-[13px] mb-0.5">IYABD AI ASSISTANT</h3>
+                 <p className="text-slate-400 font-medium text-[12px] flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                    Online
+                 </p>
+              </div>
+           </div>
+           <button onClick={() => setIsChatOpen(false)} className="w-10 h-10 bg-white/10 text-white rounded-full flex items-center justify-center hover:bg-white/20 transition-all">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+           </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 md:px-10 lg:px-20 pt-8 pb-32 space-y-6">
+           {chat.map((c) => (
+             <div key={c.id} className={`flex ${c.from === 'user' ? 'justify-end' : 'justify-start'} gap-3`}>
+                {c.from === 'ai' && (
+                   <div className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center shrink-0 mt-1 shadow-sm">
+                      <Bot size={20} />
+                   </div>
+                )}
+                <div className="max-w-[85%] md:max-w-[70%]">
+                   <div className={`p-4 md:p-5 text-[15px] leading-relaxed shadow-[0_4px_16px_rgba(0,0,0,0.04)] font-medium transition-all
+                      ${c.from === 'user' 
+                         ? 'bg-blue-600 text-white rounded-[24px] rounded-tr-[6px]' 
+                         : 'bg-white border text-slate-700 rounded-[24px] rounded-tl-[6px] whitespace-pre-line'}`}
+                   >
+                      {c.text}
+                   </div>
+                   <p className={`text-[11px] text-slate-400 font-bold mt-2 flex items-center gap-1.5 ${c.from === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      {c.time}
+                      {c.from === 'user' && <CheckCheck size={14} className="text-blue-500" />}
+                   </p>
+                </div>
+             </div>
+           ))}
+           
+           {isTyping && (
+              <div className="flex justify-start gap-3">
+                 <div className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center shrink-0 mt-1 shadow-sm">
+                    <Bot size={20} />
+                 </div>
+                 <div className="bg-white border px-5 py-4 h-[50px] shadow-[0_4px_16px_rgba(0,0,0,0.04)] rounded-[24px] rounded-tl-[6px] flex items-center gap-2">
+                    <div className="w-2 h-2 bg-slate-300 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                    <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                 </div>
+              </div>
+           )}
+           <div ref={chatBottomRef}></div>
+        </div>
+
+        <div className="fixed bottom-0 left-0 right-0 p-4 md:p-6 bg-slate-50 border-t border-slate-200">
+           <div className="max-w-4xl mx-auto flex items-end gap-3 bg-white p-2 rounded-[28px] shadow-[0_8px_30px_rgba(0,0,0,0.08)] border border-slate-100 relative">
+              <textarea 
+                 value={message}
+                 onChange={(e) => setMessage(e.target.value)}
+                 onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                       e.preventDefault();
+                       handleSendChat();
+                    }
+                 }}
+                 placeholder="Message IYABD Assistant..."
+                 className="flex-1 bg-transparent border-none outline-none resize-none max-h-[120px] min-h-[44px] py-3 px-5 text-[15px] font-medium text-slate-700"
+                 rows={1}
+              />
+              <button 
+                 onClick={() => handleSendChat()}
+                 disabled={!message.trim() || isTyping}
+                 className="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center shrink-0 hover:bg-blue-700 disabled:opacity-50 disabled:bg-slate-300 transition-colors shadow-md"
+              >
+                 <Send size={20} className="ml-1" />
+              </button>
+           </div>
+        </div>
+      </div>
+    );
+  }
 
   if (fullscreenEmbed) {
     return (
@@ -250,91 +340,27 @@ export default function SupportCenter() {
            </a>
         </div>
 
-        {/* 3. AI Chat Assistant */}
-        <div className="bg-white rounded-[24px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] overflow-hidden mb-8 border border-slate-100">
-           {/* Header */}
-           <div className="bg-slate-900 p-5 flex items-center gap-4">
+        {/* 3. AI Chat Assistant Button */}
+        <button 
+           onClick={() => setIsChatOpen(true)}
+           className="w-full bg-slate-900 rounded-[24px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] overflow-hidden mb-8 border border-slate-100 flex items-center justify-between p-5 hover:bg-slate-800 transition-colors group text-left"
+        >
+           <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center relative">
                  <Bot size={24} className="text-white" />
-                 <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-[3px] border-slate-900 rounded-full"></span>
+                 <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-[3px] border-slate-900 rounded-full animate-pulse"></span>
               </div>
               <div>
-                 <h3 className="text-white font-bold tracking-widest text-[13px] mb-0.5">IYABD AI ASSISTANT</h3>
+                 <h3 className="text-white font-bold tracking-widest text-[14px] mb-1">IYABD AI ASSISTANT</h3>
                  <p className="text-slate-400 font-medium text-[12px] flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-                    Always here for you
+                    Click to start chat
                  </p>
               </div>
            </div>
-
-           {/* Chat Body */}
-           <div className="h-[350px] overflow-y-auto p-5 bg-slate-50 space-y-4">
-               {chat.map((c) => (
-                 <div key={c.id} className={`flex ${c.from === 'user' ? 'justify-end' : 'justify-start'} gap-3`}>
-                    {c.from === 'ai' && (
-                       <div className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center shrink-0 mt-1 shadow-sm">
-                          <Bot size={16} />
-                       </div>
-                    )}
-                    <div className="max-w-[75%]">
-                       <div className={`p-4 text-[14px] leading-relaxed shadow-[0_2px_12px_rgba(0,0,0,0.04)] font-medium transition-all
-                          ${c.from === 'user' 
-                             ? 'bg-blue-600 text-white rounded-[20px] rounded-tr-[4px]' 
-                             : 'bg-white border border-slate-100 text-slate-700 rounded-[20px] rounded-tl-[4px] whitespace-pre-line'}`}
-                       >
-                          {c.text}
-                       </div>
-                       <p className={`text-[10px] text-slate-400 font-bold mt-1.5 flex items-center gap-1 ${c.from === 'user' ? 'justify-end' : 'justify-start'}`}>
-                          {c.time}
-                          {c.from === 'user' && <CheckCheck size={14} className="text-blue-500" />}
-                       </p>
-                    </div>
-                 </div>
-               ))}
-               
-               {isTyping && (
-                  <div className="flex justify-start gap-3">
-                     <div className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center shrink-0 mt-1 shadow-sm">
-                        <Bot size={16} />
-                     </div>
-                     <div className="bg-white border border-slate-100 px-4 py-3 h-[42px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] rounded-[20px] rounded-tl-[4px] flex items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></div>
-                        <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
-                        <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
-                     </div>
-                  </div>
-               )}
-               <div ref={chatBottomRef} />
+           <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+              <ChevronRight size={20} />
            </div>
-
-           {/* Chat Input */}
-           <div className="p-4 bg-white border-t border-slate-50">
-              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-[24px] p-1.5 px-2 focus-within:border-blue-300 focus-within:ring-2 ring-blue-50 transition-all">
-                 <button className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-blue-600 transition-colors">
-                    <Paperclip size={18} />
-                 </button>
-                 <input 
-                    type="text" 
-                    value={message}
-                    onChange={e => setMessage(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSendChat()}
-                    placeholder="আপনার প্রশ্ন লিখুন..."
-                    className="flex-1 bg-transparent border-none outline-none text-[15px] font-medium h-10 px-2"
-                 />
-                 <button 
-                    onClick={() => handleSendChat()}
-                    disabled={!message.trim() || isTyping}
-                    className={`w-10 h-10 flex items-center justify-center rounded-full transition-all ${
-                       message.trim() && !isTyping 
-                          ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-600/30' 
-                          : 'bg-slate-200 text-slate-400'
-                    }`}
-                 >
-                    <Send size={16} className={message.trim() && !isTyping ? 'ml-0.5' : ''} />
-                 </button>
-              </div>
-           </div>
-        </div>
+        </button>
 
         {/* 4. Email Support Accounts */}
         <div id="emails" className="mb-8">
@@ -362,69 +388,37 @@ export default function SupportCenter() {
         </div>
 
         {/* 5. Connect With Us */}
-         <div className="mb-8 overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible sm:pb-0 hide-scrollbar">
+        <div className="mb-8 overflow-visible">
             <h2 className="text-[14px] font-black tracking-widest uppercase text-slate-400 mb-4 pl-2">Connect With Us</h2>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full">
+            <div className="flex flex-row justify-between items-center w-full">
                
                <button 
                   onClick={() => { setFullscreenEmbed('facebook'); setIframeLoaded(false); }}
-                  className="flex-[1_1_31%] bg-white p-[14px] rounded-[20px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] flex items-center justify-between border border-slate-50 hover:shadow-lg transition-all group outline-none h-[64px]"
+                  className="bg-white rounded-[20px] shadow-[0_4px_16px_rgba(0,0,0,0.04)] border border-slate-100/50 hover:shadow-lg hover:-translate-y-1 transition-all flex flex-col items-center justify-center h-[90px] outline-none group"
+                  style={{ width: '31.5%' }}
                >
-                  <div className="flex items-center gap-3">
-                     <img src="https://upload.wikimedia.org/wikipedia/commons/b/b8/2021_Facebook_icon.svg" alt="Facebook" className="w-[36px] h-[36px] object-contain flex-shrink-0" />
-                     <div className="text-left hidden sm:block">
-                        <h4 className="font-bold text-[14px] text-slate-800 leading-tight">Facebook</h4>
-                        <p className="text-slate-400 font-medium text-[11px] uppercase tracking-wide mt-0.5">@iyabdshop</p>
-                     </div>
-                     <div className="text-left sm:hidden">
-                        <h4 className="font-bold text-[14px] text-slate-800 leading-tight">Facebook</h4>
-                        <p className="text-slate-400 font-medium text-[11px] uppercase tracking-wide mt-0.5">@iyabdshop</p>
-                     </div>
-                  </div>
-                  <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-[#1877F2]/10 transition-colors shrink-0">
-                     <ChevronRight size={16} className="text-slate-400 group-hover:text-[#1877F2]" />
-                  </div>
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/b/b8/2021_Facebook_icon.svg" alt="Facebook" className="w-8 h-8 object-contain mb-2 group-hover:scale-110 transition-transform" />
+                  <h4 className="font-bold text-[12px] sm:text-[13px] text-slate-800">Facebook</h4>
                </button>
 
                <button 
                   onClick={() => { setFullscreenEmbed('tiktok'); setIframeLoaded(false); }}
-                  className="flex-[1_1_31%] bg-white p-[14px] rounded-[20px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] flex items-center justify-between border border-slate-50 hover:shadow-lg transition-all group outline-none h-[64px]"
+                  className="bg-white rounded-[20px] shadow-[0_4px_16px_rgba(0,0,0,0.04)] border border-slate-100/50 hover:shadow-lg hover:-translate-y-1 transition-all flex flex-col items-center justify-center h-[90px] outline-none group"
+                  style={{ width: '31.5%' }}
                >
-                  <div className="flex items-center gap-3">
-                     <img src="https://upload.wikimedia.org/wikipedia/commons/3/34/Ionicons_logo-tiktok.svg" alt="TikTok" className="w-[36px] h-[36px] object-contain flex-shrink-0" />
-                     <div className="text-left hidden sm:block">
-                        <h4 className="font-bold text-[14px] text-slate-800 leading-tight">TikTok</h4>
-                        <p className="text-slate-400 font-medium text-[11px] uppercase tracking-wide mt-0.5">@iyabdshop</p>
-                     </div>
-                     <div className="text-left sm:hidden">
-                        <h4 className="font-bold text-[14px] text-slate-800 leading-tight">TikTok</h4>
-                        <p className="text-slate-400 font-medium text-[11px] uppercase tracking-wide mt-0.5">@iyabdshop</p>
-                     </div>
-                  </div>
-                  <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-slate-200 transition-colors shrink-0">
-                     <ChevronRight size={16} className="text-slate-400 group-hover:text-black" />
-                  </div>
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/3/34/Ionicons_logo-tiktok.svg" alt="TikTok" className="w-8 h-8 object-contain mb-2 group-hover:scale-110 transition-transform" />
+                  <h4 className="font-bold text-[12px] sm:text-[13px] text-slate-800">TikTok</h4>
                </button>
 
                <button 
                   onClick={() => { setFullscreenEmbed('youtube'); setIframeLoaded(false); }}
-                  className="flex-[1_1_31%] bg-white p-[14px] rounded-[20px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] flex items-center justify-between border border-slate-50 hover:shadow-lg transition-all group outline-none h-[64px]"
+                  className="bg-white rounded-[20px] shadow-[0_4px_16px_rgba(0,0,0,0.04)] border border-slate-100/50 hover:shadow-lg hover:-translate-y-1 transition-all flex flex-col items-center justify-center h-[90px] outline-none group"
+                  style={{ width: '31.5%' }}
                >
-                  <div className="flex items-center gap-3">
-                     <img src="https://upload.wikimedia.org/wikipedia/commons/0/09/YouTube_full-color_icon_%282017%29.svg" alt="YouTube" className="w-[36px] h-[36px] object-contain flex-shrink-0" />
-                     <div className="text-left hidden sm:block">
-                        <h4 className="font-bold text-[14px] text-slate-800 leading-tight">YouTube</h4>
-                        <p className="text-slate-400 font-medium text-[11px] uppercase tracking-wide mt-0.5">@IYABD_01</p>
-                     </div>
-                     <div className="text-left sm:hidden">
-                        <h4 className="font-bold text-[14px] text-slate-800 leading-tight">YouTube</h4>
-                        <p className="text-slate-400 font-medium text-[11px] uppercase tracking-wide mt-0.5">@IYABD_01</p>
-                     </div>
-                  </div>
-                  <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-[#FF0000]/10 transition-colors shrink-0">
-                     <ChevronRight size={16} className="text-slate-400 group-hover:text-[#FF0000]" />
-                  </div>
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/0/09/YouTube_full-color_icon_%282017%29.svg" alt="YouTube" className="w-8 h-8 object-contain mb-2 group-hover:scale-110 transition-transform" />
+                  <h4 className="font-bold text-[12px] sm:text-[13px] text-slate-800">YouTube</h4>
                </button>
+
             </div>
          </div>
 
