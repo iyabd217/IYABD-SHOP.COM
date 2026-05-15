@@ -1283,8 +1283,8 @@ const ShopPage = () => {
       ) : (
         <div className="py-20 text-center bg-white rounded-[40px] border border-slate-100 shadow-sm">
            <PackageX size={80} className="mx-auto text-slate-200 mb-6 drop-shadow-sm" />
-           <h3 className="text-2xl font-black text-slate-900 mb-2 uppercase tracking-tight">No Products Available</h3>
-           <p className="text-slate-500 text-sm max-w-sm mx-auto font-medium">It looks like we don't have any products here right now. Explore other categories or adjust your filters.</p>
+           <h3 className="text-2xl font-black text-slate-900 mb-2 uppercase tracking-tight">Unable to load data or No Products</h3>
+           <p className="text-slate-500 text-sm max-w-sm mx-auto font-medium">It looks like we don't have any products here right now or the connection failed. Explore other categories or adjust your filters.</p>
            <div className="flex justify-center gap-4 mt-8">
              <Link 
                to="/categories"

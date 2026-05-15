@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { STORAGE_BUCKETS } from './supabaseStorage';
 
 class CmsService {
   /**
@@ -41,19 +42,19 @@ class CmsService {
    * Specific wrappers for the requested structure
    */
   async getProducts() {
-    return this.getJSON<any[]>('product-data', 'products.json', []);
+    return this.getJSON<any[]>(STORAGE_BUCKETS.productData, 'products.json', []);
   }
 
   async getCategories() {
-    return this.getJSON<any[]>('product-data', 'categories.json', []);
+    return this.getJSON<any[]>(STORAGE_BUCKETS.productData, 'categories.json', []);
   }
 
   async getBanners() {
-    return this.getJSON<any[]>('product-data', 'banners.json', []);
+    return this.getJSON<any[]>(STORAGE_BUCKETS.productData, 'banners.json', []);
   }
 
   async getSocialLinks() {
-    return this.getJSON<any>('website-config', 'social-links.json', {
+    return this.getJSON<any>(STORAGE_BUCKETS.websiteConfig, 'social-links.json', {
       facebook: "https://facebook.com/iyabdshop",
       youtube: "https://youtube.com/@IYABD_01",
       tiktok: "https://tiktok.com/@iyabdshop",
@@ -62,7 +63,7 @@ class CmsService {
   }
 
   async getAiTraining() {
-    return this.getJSON<any>('support-system', 'ai-training.json', {
+    return this.getJSON<any>(STORAGE_BUCKETS.supportSystem, 'ai-training.json', {
       greetings: {
         assalamualaikum: "ওয়ালাইকুম আসসালাম 🌸 IYABD Support এ আপনাকে স্বাগতম।"
       },
@@ -73,7 +74,7 @@ class CmsService {
   }
 
   async getWebsiteConfig(fileName: string) {
-    return this.getJSON<any>('website-config', fileName, {});
+    return this.getJSON<any>(STORAGE_BUCKETS.websiteConfig, fileName, {});
   }
 }
 

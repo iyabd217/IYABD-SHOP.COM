@@ -234,15 +234,27 @@ export const productService = {
   },
   
   subscribeAll(callback: (products: any[]) => void) {
-    const path = 'products';
-    return onSnapshot(collection(db, path), (snapshot) => {
-      const products = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
-      callback(products);
-    }, (error) => {
-      console.error('Firestore subscribeAll error: ', error);
-      callback([]); // Return empty array to stop loading
-      // Don't throw to ErrorBoundary just for product list reading issues
+    // Try CMS first
+    cmsService.getProducts().then(cmsProducts => {
+       if (cmsProducts && cmsProducts.length > 0) {
+          callback(cmsProducts);
+       } else {
+          // Fallback to Firestore
+          const path = 'products';
+          onSnapshot(collection(db, path), (snapshot) => {
+            const products = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+            callback(products);
+          }, (error) => {
+            console.error('Firestore subscribeAll error: ', error);
+            callback([]); 
+          });
+       }
+    }).catch(e => {
+       console.error("CMS failed", e);
+       callback([]);
     });
+    
+    return () => {}; // return dummy unsubscribe
   },
   
   async getByCategory(category: string) {

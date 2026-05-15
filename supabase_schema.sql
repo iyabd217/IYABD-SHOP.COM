@@ -1,96 +1,105 @@
--- Run this script in the Supabase SQL Editor to create the required tables
+-- PostgreSQL tables for the application as requested
 
--- Users Table
-CREATE TABLE IF NOT EXISTS public.users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    uid UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-    email TEXT,
-    "displayName" TEXT,
-    "photoURL" TEXT,
-    "phoneNumber" TEXT,
-    address TEXT,
-    division TEXT,
-    district TEXT,
-    area TEXT,
-    street TEXT,
-    coins INTEGER DEFAULT 0,
-    "registrationDate" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Products Table
-CREATE TABLE IF NOT EXISTS public.products (
+CREATE TABLE IF NOT EXISTS products (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     description TEXT,
-    price NUMERIC NOT NULL,
-    "discountPrice" NUMERIC,
-    image TEXT,
-    category TEXT,
-    rating NUMERIC DEFAULT 0,
-    reviews INTEGER DEFAULT 0,
-    colors TEXT[],
-    sizes TEXT[],
-    "isNew" BOOLEAN DEFAULT false,
-    "isTrending" BOOLEAN DEFAULT false,
-    "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    price DECIMAL(10, 2) NOT NULL,
+    discount DECIMAL(10, 2) DEFAULT 0,
+    category_id TEXT,
+    subcategory_id TEXT,
+    image_url TEXT,
+    images JSONB DEFAULT '[]'::jsonb,
+    sizes JSONB DEFAULT '[]'::jsonb,
+    colors JSONB DEFAULT '[]'::jsonb,
+    stock INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Categories Table
-CREATE TABLE IF NOT EXISTS public.categories (
+CREATE TABLE IF NOT EXISTS customers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    auth_id TEXT UNIQUE NOT NULL,
+    name TEXT,
+    email TEXT UNIQUE NOT NULL,
+    phone TEXT,
+    address TEXT,
+    profile_image TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID REFERENCES customers(id),
+    total DECIMAL(10, 2) NOT NULL,
+    shipping_status TEXT DEFAULT 'PENDING',
+    payment_status TEXT DEFAULT 'UNPAID',
+    payment_method TEXT,
+    items JSONB NOT NULL,
+    shipping_address JSONB,
+    invoice_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
-    image TEXT,
-    "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    description TEXT,
+    icon TEXT,
+    banner_image TEXT,
+    slug TEXT UNIQUE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Orders Table
-CREATE TABLE IF NOT EXISTS public.orders (
+CREATE TABLE IF NOT EXISTS flash_sale (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    "userId" TEXT, -- Can be 'guest' or a UUID
-    items JSONB NOT NULL,
-    total NUMERIC NOT NULL,
-    subtotal NUMERIC NOT NULL,
-    address TEXT NOT NULL,
-    phone TEXT NOT NULL,
-    "customerName" TEXT NOT NULL,
-    "paymentMethod" TEXT NOT NULL,
-    "deliveryMethod" TEXT,
-    "deliveryFee" NUMERIC,
-    "userEmail" TEXT,
-    status TEXT DEFAULT 'Pending',
-    date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    product_id UUID REFERENCES products(id),
+    discount_percentage DECIMAL(5, 2) NOT NULL,
+    start_time TIMESTAMPTZ NOT NULL,
+    end_time TIMESTAMPTZ NOT NULL,
+    is_active BOOLEAN DEFAULT true
 );
 
--- Row Level Security (RLS) policies
--- Enable RLS
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
-
--- Create policies (modify for stricter production use)
--- Public read access for products and categories
-CREATE POLICY "Public products are viewable by everyone" ON public.products FOR SELECT USING (true);
-CREATE POLICY "Public categories are viewable by everyone" ON public.categories FOR SELECT USING (true);
-
--- Allow anyone (including guests) to create orders
-CREATE POLICY "Anyone can insert orders" ON public.orders FOR INSERT WITH CHECK (true);
-
--- Users can view their own orders
-CREATE POLICY "Users can view their own orders" ON public.orders FOR SELECT USING (
-  auth.uid()::text = "userId" 
-  OR "userId" = 'guest'
+CREATE TABLE IF NOT EXISTS coupons (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code TEXT UNIQUE NOT NULL,
+    discount_percentage DECIMAL(5, 2),
+    discount_amount DECIMAL(10, 2),
+    min_purchase DECIMAL(10, 2) DEFAULT 0,
+    max_uses INTEGER,
+    used_count INTEGER DEFAULT 0,
+    expires_at TIMESTAMPTZ,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Users can manage their own profile
-CREATE POLICY "Users can manage their own profile" ON public.users FOR ALL USING (auth.uid() = uid);
+CREATE TABLE IF NOT EXISTS support_messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID REFERENCES customers(id),
+    message TEXT NOT NULL,
+    reply TEXT,
+    is_read BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    replied_at TIMESTAMPTZ
+);
 
--- Note:
--- To allow admins to manage everything, you'd want to add admin policies,
--- or handle admin actions through a secure backend or Supabase service role.
--- For local development/testing, you can optionally disable RLS:
--- ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
--- ALTER TABLE public.products DISABLE ROW LEVEL SECURITY;
--- ALTER TABLE public.categories DISABLE ROW LEVEL SECURITY;
--- ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;
+CREATE TABLE IF NOT EXISTS ai_training (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    topic TEXT NOT NULL,
+    knowledge_data TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS banners (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT,
+    subtitle TEXT,
+    banner_url TEXT NOT NULL,
+    redirect_url TEXT,
+    type TEXT DEFAULT 'Hero Banner',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
