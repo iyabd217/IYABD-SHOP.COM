@@ -8,6 +8,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { categoryService, storageService, optimizeImage } from '../../lib/services';
 import { adminService } from '../../lib/adminServices';
 
+const CategoryImage = ({ src, className, alt = "" }: any) => {
+    const fallback = 'https://images.unsplash.com/photo-1555529733-0e670560f8e1?q=80&w=400&fit=crop';
+    return (
+        <img 
+            src={src || fallback} 
+            className={className} 
+            alt={alt}
+            onError={(e: any) => { e.target.src = fallback; }}
+            referrerPolicy="no-referrer"
+        />
+    );
+};
+
 const ManageCategories: React.FC = () => {
     const [categories, setCategories] = useState<any[]>([]);
     const [heroBanners, setHeroBanners] = useState<any[]>([]);
@@ -268,10 +281,10 @@ const ManageCategories: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {heroBanners.map((banner) => (
+                        {Array.isArray(heroBanners) && heroBanners.map((banner) => (
                             <div key={banner.id} className="bg-white rounded-[32px] border border-slate-100 overflow-hidden shadow-sm group">
                                 <div className="aspect-[21/9] relative overflow-hidden">
-                                    <img src={banner.banner_image || banner.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="" />
+                                    <CategoryImage src={banner.banner_image || banner.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="" />
                                     <div className="absolute top-4 right-4 flex gap-2">
                                         <button className="w-8 h-8 bg-white/90 backdrop-blur-md rounded-full shadow-lg flex items-center justify-center text-slate-400 hover:text-primary transition-all"><Edit2 size={14} /></button>
                                         <button onClick={() => handleDeleteHero(banner.id)} className="w-8 h-8 bg-white/90 backdrop-blur-md rounded-full shadow-lg flex items-center justify-center text-slate-400 hover:text-red-500 transition-all"><Trash2 size={14} /></button>
@@ -287,14 +300,14 @@ const ManageCategories: React.FC = () => {
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 truncate">{banner.subtitle}</p>
                                     <div className="flex items-center justify-between mt-4">
                                         <div className="flex -space-x-2">
-                                            {(banner.product_images || []).slice(0, 3).map((img: string, i: number) => (
+                                            {Array.isArray(banner.product_images) && banner.product_images.slice(0, 3).map((img: string, i: number) => (
                                                 <div key={i} className="w-6 h-6 rounded-full border-2 border-white overflow-hidden bg-slate-100 shadow-sm">
-                                                    <img src={img} className="w-full h-full object-cover" alt="" />
+                                                    <CategoryImage src={img} className="w-full h-full object-cover" alt="" />
                                                 </div>
                                             ))}
-                                            {(banner.product_images || []).length > 3 && (
+                                            {Array.isArray(banner.product_images) && banner.product_images.length > 3 && (
                                                 <div className="w-6 h-6 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[8px] font-black text-slate-500">
-                                                    +{(banner.product_images || []).length - 3}
+                                                    {banner.product_images.length - 3}
                                                 </div>
                                             )}
                                         </div>
@@ -330,25 +343,25 @@ const ManageCategories: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
-                                {categories.map((cat) => (
+                                {Array.isArray(categories) && categories.map((cat) => (
                                     <tr key={cat.id} className="hover:bg-slate-50 transition-all">
                                         <td className="px-6 py-4">
-                                            <p className="font-black text-slate-900 text-sm">{cat.category_name}</p>
+                                            <p className="font-black text-slate-900 text-sm">{cat.category_name || cat.name}</p>
                                             <p className="text-[9px] font-bold text-slate-400 uppercase">/{cat.slug}</p>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden">
-                                                {cat.icon ? <img src={cat.icon} className="w-full h-full object-cover" alt="" /> : <ImageIcon size={20} className="text-slate-300" />}
+                                                {cat.icon ? <CategoryImage src={cat.icon} className="w-full h-full object-cover" alt="" /> : <ImageIcon size={20} className="text-slate-300" />}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="w-16 h-20 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
-                                                {cat.banner_image ? <img src={cat.banner_image} className="w-full h-full object-cover" alt="" /> : <ImageIcon size={20} className="text-slate-300" />}
+                                                {cat.banner_image ? <CategoryImage src={cat.banner_image} className="w-full h-full object-cover" alt="" /> : <ImageIcon size={20} className="text-slate-300" />}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="h-10 w-32 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
-                                                {cat.top_banner ? <img src={cat.top_banner} className="w-full h-full object-cover" alt="" /> : <span className="text-[9px] font-bold text-slate-300 uppercase">No Banner</span>}
+                                                {cat.top_banner ? <CategoryImage src={cat.top_banner} className="w-full h-full object-cover" alt="" /> : <span className="text-[9px] font-bold text-slate-300 uppercase">No Banner</span>}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">

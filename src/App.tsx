@@ -935,11 +935,10 @@ const YouTubePromoSlider = () => {
                     media="(max-width: 640px)" 
                     srcSet={banner.mobile_banner || banner.banner_image || banner.banner_url || banner.image} 
                   />
-                  <img 
+                  <SafeImage 
                     src={banner.desktop_banner || banner.banner_image || banner.banner_url || banner.image} 
                     alt={banner.title || "Hero Banner"}
                     className={`w-full h-full object-cover transform transition-transform duration-[8s] ease-in-out ${index % 2 === 0 ? 'hover:translate-x-[-2%] scale-110' : 'hover:translate-x-[2%] scale-110'}`}
-                    referrerPolicy="no-referrer"
                   />
                 </picture>
                 
@@ -1042,7 +1041,7 @@ const CategorySlider = () => {
                                     {/* Floating Icon */}
                                     <div className="absolute top-2 left-2 md:top-3 md:left-3 w-8 h-8 md:w-10 md:h-10 bg-white/90 backdrop-blur-md rounded-xl md:rounded-2xl shadow-lg flex items-center justify-center transform -rotate-6 group-hover:rotate-0 transition-transform">
                                         {cat.icon?.includes('http') ? (
-                                            <img src={cat.icon} className="w-5 h-5 md:w-6 md:h-6 object-contain" alt="" />
+                                            <SafeImage src={cat.icon} className="w-5 h-5 md:w-6 md:h-6 object-contain" alt="" />
                                         ) : (
                                             <span className="text-xs md:text-sm">{cat.icon || '📦'}</span>
                                         )}
@@ -2118,11 +2117,11 @@ const AdminPage = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {products?.map((p) => (
+                      {Array.isArray(products) && products.map((p) => (
                         <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
                           <td className="px-6 py-4 flex items-center gap-4">
-                            <img src={p.image} className="w-10 h-10 object-cover rounded-xl shadow-sm border border-slate-100" />
-                            <span className="text-xs font-bold text-slate-700">{p.name}</span>
+                            <SafeImage src={p.image || p.product_image} className="w-10 h-10 object-cover rounded-xl shadow-sm border border-slate-100" />
+                            <span className="text-xs font-bold text-slate-700">{p.name || p.title}</span>
                           </td>
                           <td className="px-6 py-4 text-xs font-bold text-slate-400">{p.category}</td>
                           <td className="px-6 py-4 text-xs font-extrabold text-slate-900">{formatPrice(p.price)}</td>
@@ -2511,7 +2510,12 @@ const ProductDetailPage = () => {
         }
         
         // Add to recently viewed
-        const recent = JSON.parse(localStorage.getItem('recently_viewed') || '[]');
+        let recent = [];
+        try {
+          recent = JSON.parse(localStorage.getItem('recently_viewed') || '[]');
+        } catch (e) {
+          console.error("Local storage parse error", e);
+        }
         const filtered = recent.filter((p: any) => p.id !== formattedProduct.id);
         const updated = [formattedProduct, ...filtered].slice(0, 10);
         localStorage.setItem('recently_viewed', JSON.stringify(updated));
@@ -2708,20 +2712,20 @@ const ProductDetailPage = () => {
                 <span className="text-[10px] text-slate-400">({product.reviewCount} Reviews)</span>
               </div>
             </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 mb-2 leading-tight">{product.name}</h1>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 mb-2 leading-tight">{product?.name || 'Loading Product...'}</h1>
             <div className="flex items-center gap-4 mb-6">
               <p className="text-3xl font-black text-primary">
-                {formatPrice((Number(selectedVariant?.price) || product.price) * (1 - (Number(selectedVariant?.discount) || product.discount || 0) / 100))}
+                {formatPrice((Number(selectedVariant?.price) || product?.price || 0) * (1 - (Number(selectedVariant?.discount) || product?.discount || 0) / 100))}
               </p>
-              {(Number(selectedVariant?.discount) > 0 || product.discount > 0) && (
+              {(Number(selectedVariant?.discount) > 0 || (product?.discount || 0) > 0) && (
                 <p className="text-lg font-bold text-slate-300 line-through">
-                  {formatPrice(Number(selectedVariant?.price) || product.price)}
+                  {formatPrice(Number(selectedVariant?.price) || product?.price || 0)}
                 </p>
               )}
             </div>
             
             <p className="text-slate-500 text-sm font-medium leading-relaxed mb-8">
-              {product.description}
+              {product?.description || 'No description available for this item.'}
             </p>
           </div>
           
@@ -2789,14 +2793,14 @@ const ProductDetailPage = () => {
                </h3>
                <div className="grid grid-cols-2 gap-y-4 gap-x-6">
                  {[
-                   { label: 'Fabric Type', val: product.specs?.fabric || product.fabric_type || 'Premium Cotton' },
-                   { label: 'GSM', val: product.specs?.gsm || product.gsm || '250 GSM' },
-                   { label: 'Material', val: product.specs?.material || product.material || '100% Organic' },
-                   { label: 'Fit Type', val: product.specs?.fit || product.fit_type || 'Regular Fit' },
-                   { label: 'Wash', val: product.specs?.wash || product.wash_instruction || 'Machine Wash' },
-                   { label: 'Stretch', val: product.specs?.stretch || product.stretch_type || 'Medium Stretch' },
-                   { label: 'Country', val: product.specs?.country || product.country || 'Imported' },
-                   { label: 'Stitch', val: product.specs?.stitch || 'Double Needled' }
+                   { label: 'Fabric Type', val: product?.specs?.fabric || product?.fabric_type || 'Premium Cotton' },
+                   { label: 'GSM', val: product?.specs?.gsm || product?.gsm || '250 GSM' },
+                   { label: 'Material', val: product?.specs?.material || product?.material || '100% Organic' },
+                   { label: 'Fit Type', val: product?.specs?.fit || product?.fit_type || 'Regular Fit' },
+                   { label: 'Wash', val: product?.specs?.wash || product?.wash_instruction || 'Machine Wash' },
+                   { label: 'Stretch', val: product?.specs?.stretch || product?.stretch_type || 'Medium Stretch' },
+                   { label: 'Country', val: product?.specs?.country || product?.country || 'Imported' },
+                   { label: 'Stitch', val: product?.specs?.stitch || 'Double Needled' }
                  ].map((spec, i) => (
                    <div key={i} className="flex flex-col gap-1">
                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{spec.label}</span>
@@ -3023,7 +3027,7 @@ const CartPage = () => {
             {cart.map((item) => (
               <div key={item.id} className="marketplace-card flex gap-4 p-4 bg-white relative group">
                 <div className="w-20 h-20 bg-slate-50 rounded-2xl overflow-hidden flex-shrink-0">
-                  <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                  <SafeImage src={item.image} alt={item.name} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-1 flex flex-col justify-center gap-1">
                   <h3 className="text-sm font-bold text-slate-800 line-clamp-1">{item.name}</h3>
@@ -3451,9 +3455,9 @@ const OrdersListSubPage = ({ title, orders, onBack }: { title: string, orders: a
                   <span className="bg-primary/10 text-primary text-[9px] font-black px-2 py-1 rounded-md uppercase">{o.status}</span>
                </div>
                <div className="flex gap-3 mb-4">
-                  {o.items?.map((item: any, idx: number) => (
+                  {Array.isArray(o.items) && o.items.map((item: any, idx: number) => (
                     <div key={idx} className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 overflow-hidden shrink-0">
-                      <img src={item.image} className="w-full h-full object-cover" alt="" />
+                      <SafeImage src={item.image} className="w-full h-full object-cover" alt="" />
                     </div>
                   ))}
                </div>
@@ -4406,7 +4410,12 @@ const ProfilePage = () => {
   
   // Simulation for Demo
   const coins = profile?.coins || 1250;
-  const recentProducts = JSON.parse(localStorage.getItem('recently_viewed') || '[]');
+  let recentProducts = [];
+  try {
+    recentProducts = JSON.parse(localStorage.getItem('recently_viewed') || '[]');
+  } catch (e) {
+    console.error("Local storage error", e);
+  }
 
   useEffect(() => {
     if (user) {
@@ -4473,9 +4482,9 @@ const ProfilePage = () => {
               <div className="relative">
                 <div className="w-20 h-20 rounded-[28px] overflow-hidden border-4 border-slate-50 shadow-sm bg-primary/10 flex items-center justify-center text-primary text-2xl font-bold">
                   {profile?.photoURL ? (
-                    <img src={profile.photoURL} alt="" className="w-full h-full object-cover" />
+                    <SafeImage src={profile.photoURL} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    profile?.displayName?.[0] || user.email?.[0] || 'U'
+                    profile?.displayName?.[0] || user?.email?.[0] || 'U'
                   )}
                 </div>
                 <button onClick={() => setSubPage('profile')} className="absolute -bottom-1 -right-1 w-7 h-7 bg-primary text-white rounded-xl flex items-center justify-center border-4 border-white shadow-sm ring-2 ring-primary/10 active:scale-90 transition-all">
@@ -4810,14 +4819,14 @@ const FlashSalePage = () => {
                 </div>
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-10">
-                    {displayProducts.map((product) => (
+                    {Array.isArray(displayProducts) && displayProducts.map((product) => (
                         <Link 
                             key={product.id} 
                             to={product.product_id ? `/product/${product.product_id}` : '#'}
                             className="group flex flex-col"
                         >
                             <div className="relative aspect-[3/4] bg-white rounded-[40px] overflow-hidden shadow-sm border border-slate-50 mb-6 transition-all group-hover:shadow-2xl group-hover:shadow-red-900/10 group-hover:-translate-y-2">
-                                <img src={product.product_image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" alt={product?.title || 'Product'} />
+                                <SafeImage src={product.product_image || product.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" alt={product?.title || 'Product'} />
                                 <div className="absolute top-6 left-6 bg-red-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-xl shadow-red-900/20">
                                     -{product.discount_percent}%
                                 </div>
