@@ -3450,7 +3450,7 @@ const OrdersListSubPage = ({ title, orders, onBack }: { title: string, orders: a
                <div className="flex justify-between items-start mb-4">
                   <div>
                     <h4 className="text-sm font-black text-slate-800">#{o.id.slice(0, 8)}</h4>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new String(o.createdAt?.toDate?.() || new Date()).split('G')[0]}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new String(o.createdAt?.toDate ? o.createdAt.toDate() : (o.createdAt?.seconds ? new Date(o.createdAt.seconds * 1000) : (o.createdAt ? new Date(o.createdAt) : new Date()))).split('G')[0]}</p>
                   </div>
                   <span className="bg-primary/10 text-primary text-[9px] font-black px-2 py-1 rounded-md uppercase">{o.status}</span>
                </div>

@@ -20,17 +20,17 @@ service cloud.firestore {
     match /hero_banners/{id} { allow read: if true; allow write: if isAdmin(); }
     match /brands/{id} { allow read: if true; allow write: if isAdmin(); }
     match /blog_posts/{id} { allow read: if true; allow write: if isAdmin(); }
-    match /reviews/{id} { allow read: if true; allow write: if isSignedIn(); }
-    match /users/{userId} { allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin()); }
+    match /reviews/{id} { allow read, write: if true; }
+    match /users/{userId} { allow read, write: if true; }
     match /orders/{orderId} {
       allow create: if true;
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userEmail == request.auth.token.get('email', '') || isAdmin());
+      allow read: if true;
       allow update, delete: if isAdmin();
     }
-    match /wishlist/{wishId} { allow read, write: if isSignedIn() && (request.auth.uid == wishId || isAdmin()); }
-    match /support_messages/{id} { allow create: if true; allow read, write: if isAdmin(); }
+    match /wishlist/{wishId} { allow read, write: if true; }
+    match /support_messages/{id} { allow create, read: if true; allow write: if isAdmin(); }
     match /activity_logs/{id} { allow read, create: if isAdmin(); }
-    match /coupons/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /coupons/{id} { allow read: if true; allow write: if isAdmin(); }
     match /admins/{id} { allow read: if isAdmin(); }
     
     match /{document=**} {

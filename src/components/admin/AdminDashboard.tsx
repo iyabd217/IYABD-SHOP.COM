@@ -124,7 +124,16 @@ const HomeContent = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) 
             const amount = Number(order.total) || 0;
             totalRevenue += amount;
             
-            const dateStr = order.createdAt?.split('T')[0];
+            let dateStr = '';
+            const createdAt = order.createdAt;
+            if (createdAt) {
+                try {
+                    const dateObj = createdAt.toDate ? createdAt.toDate() : (createdAt.seconds ? new Date(createdAt.seconds * 1000) : new Date(createdAt));
+                    dateStr = dateObj.toISOString().split('T')[0];
+                } catch (e) {
+                    dateStr = String(createdAt).split('T')[0];
+                }
+            }
             if (dateStr === todayStr) {
                 todayRevenue += amount;
             }
