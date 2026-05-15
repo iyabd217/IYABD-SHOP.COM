@@ -316,11 +316,26 @@ export const productService = {
   async create(productData: any) {
     const path = 'products';
     try {
+      // Sync with Firebase
       const docRef = await addDoc(collection(db, path), {
         ...productData,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
+      
+      // Sync with Supabase table
+      try {
+        const { supabase } = await import('./supabaseClient');
+        await supabase.from('products').insert([{
+          ...productData,
+          id: docRef.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }]);
+      } catch (e) {
+        console.warn("Supabase Sync Failed:", e);
+      }
+      
       return docRef.id;
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, path);
@@ -335,6 +350,17 @@ export const productService = {
         ...productData,
         updatedAt: serverTimestamp()
       });
+
+      // Sync with Supabase table
+      try {
+        const { supabase } = await import('./supabaseClient');
+        await supabase.from('products').update({
+          ...productData,
+          updated_at: new Date().toISOString()
+        }).eq('id', id);
+      } catch (e) {
+        console.warn("Supabase Sync Failed:", e);
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
     }
@@ -344,6 +370,14 @@ export const productService = {
     const path = `products/${id}`;
     try {
       await deleteDoc(doc(db, 'products', id));
+      
+      // Sync with Supabase table
+      try {
+        const { supabase } = await import('./supabaseClient');
+        await supabase.from('products').delete().eq('id', id);
+      } catch (e) {
+        console.warn("Supabase Sync Failed:", e);
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, path);
     }
@@ -403,6 +437,20 @@ export const categoryService = {
         image: image || '',
         createdAt: serverTimestamp()
       });
+
+      // Sync with Supabase table
+      try {
+        const { supabase } = await import('./supabaseClient');
+        await supabase.from('categories').insert([{
+          name,
+          banner_image: image || '',
+          slug: name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, ''),
+          created_at: new Date().toISOString()
+        }]);
+      } catch (e) {
+        console.warn("Supabase Sync Failed:", e);
+      }
+
       return docRef.id;
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, path);
@@ -432,6 +480,20 @@ export const bannerService = {
     const path = `banners/${type}`;
     try {
         await setDoc(doc(db, 'banners', type), { ...data, updatedAt: serverTimestamp() }, { merge: true });
+
+        // Sync with Supabase table
+        try {
+            const { supabase } = await import('./supabaseClient');
+            await supabase.from('banners').upsert({
+                title: data.title || type,
+                banner_url: data.banner_url || data.image_url || data.image,
+                type: data.type || type,
+                is_active: true,
+                created_at: new Date().toISOString()
+            });
+        } catch (e) {
+            console.warn("Supabase Sync Failed:", e);
+        }
     } catch (error) {
         handleFirestoreError(error, OperationType.UPDATE, path);
     }

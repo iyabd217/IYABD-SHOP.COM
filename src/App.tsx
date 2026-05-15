@@ -366,6 +366,28 @@ const BottomNav = () => {
 };
 // --- Shared Components ---
 
+const SafeImage = ({ src, alt, className, loading = "lazy", ...props }: any) => {
+  const [error, setError] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  
+  const fallback = 'https://images.unsplash.com/photo-1555529733-0e670560f8e1?q=80&w=400&fit=crop';
+  
+  return (
+    <div className={`relative overflow-hidden ${className}`}>
+      {!loaded && <div className="absolute inset-0 bg-slate-100 animate-pulse" />}
+      <img 
+        src={error || !src ? fallback : src} 
+        alt={alt}
+        loading={loading}
+        onLoad={() => setLoaded(true)}
+        onError={() => setError(true)}
+        className={`${className} ${loaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}
+        {...props}
+      />
+    </div>
+  );
+};
+
 const ProductCard = ({ product }: any) => {
   const { addToCart } = useCart();
   const { wishlist, addToWishlist, removeFromWishlist } = useWishlist();
@@ -401,10 +423,9 @@ const ProductCard = ({ product }: any) => {
   return (
     <Link to={`/product/${product.id}`} className="marketplace-card group block overflow-hidden hover:-translate-y-[3px] hover:shadow-lg transition-all duration-300" style={{ transition: '0.3s ease' }}>
       <div className="aspect-square bg-slate-50 relative">
-        <img 
+        <SafeImage 
           src={optimizeImg(product?.image || product?.product_image || 'https://images.unsplash.com/photo-1555529733-0e670560f8e1?q=80&w=400&fit=crop', { width: 400 })} 
           alt={product.name}
-          loading="lazy"
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
         />
         {product.discount > 0 && (
@@ -567,7 +588,7 @@ const FlashSaleSection = () => {
                                 className="block rounded-[30px] bg-white p-3 shadow-xl shadow-red-900/5 group/card transition-all"
                             >
                                 <div className="aspect-[4/5] rounded-[24px] overflow-hidden bg-slate-50 mb-3 relative">
-                                    <img src={p.product_image} className="w-full h-full object-cover group-hover/card:scale-110 transition-transform duration-700" alt="" />
+                                    <SafeImage src={p.product_image} className="w-full h-full object-cover group-hover/card:scale-110 transition-transform duration-700" alt="" />
                                     <div className="absolute top-2 left-2 bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">
                                         -{p.discount_percent}%
                                     </div>
@@ -837,11 +858,11 @@ const YouTubePromoSlider = () => {
               exit={{ opacity: 0 }}
               className="absolute inset-0"
             >
-              <img 
-                src={optimizeImg(banner?.image_url || banner?.banner_url || banner?.banner_image || banner?.image || 'https://images.unsplash.com/photo-1555529733-0e670560f8e1?q=80&w=2560&fit=crop', { width: 2560, height: 1440 })} 
-                className="w-full h-full object-cover"
-                alt={banner.title}
-              />
+            <SafeImage 
+              src={optimizeImg(banner?.image_url || banner?.banner_url || banner?.banner_image || banner?.image || 'https://images.unsplash.com/photo-1555529733-0e670560f8e1?q=80&w=2560&fit=crop', { width: 2560, height: 1440 })} 
+              className="w-full h-full object-cover"
+              alt={banner.title}
+            />
               <div className="absolute inset-0 bg-black/30 flex items-center justify-center text-center p-12">
                  <div className="max-w-2xl">
                     <h2 className="text-white text-3xl md:text-6xl font-black tracking-tighter mb-4 drop-shadow-2xl">
@@ -1117,6 +1138,17 @@ const ShopPage = () => {
   const activeCategoryData = categories.find(c => c.id === activeCat) || 
                              { id: activeCat, name: activeCat.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()), description: `Premium ${activeCat.replace('-', ' ')} collection at best prices.`, banner_url: null };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Loading products...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="py-2 min-h-[60vh] pb-24">
       <Meta title={q ? `Search results for "${q}"` : (activeCategoryData?.name || "Browse Our Collection")} />
@@ -1128,7 +1160,7 @@ const ShopPage = () => {
           animate={{ opacity: 1, y: 0 }}
           className="relative w-full aspect-video md:aspect-[16/5] rounded-[32px] overflow-hidden mb-8 shadow-xl border border-slate-100"
         >
-          <img 
+          <SafeImage 
             src={optimizeImg(activeCategoryData?.banner_url || activeCategoryData?.banner_image || 'https://images.unsplash.com/photo-1555529733-0e670560f8e1?q=80&w=1600&fit=crop', { width: 1600, height: 600 })} 
             className="w-full h-full object-cover" 
             alt={activeCategoryData.name} 
@@ -2646,7 +2678,7 @@ const ProductDetailPage = () => {
                    }}
                    className={`flex-shrink-0 w-[60px] h-[60px] md:w-[80px] md:h-[80px] rounded-[12px] overflow-hidden border-2 transition-all duration-300 ${selectedVariant?.color === variant.color ? 'border-[#7c3aed] scale-105 shadow-lg shadow-[#7c3aed]/10' : 'border-transparent opacity-70 hover:opacity-100 hover:border-slate-200'}`}
                  >
-                   <img src={variant.image} className="w-full h-full object-cover" alt={`Variant ${variant.color}`} loading="lazy" />
+                   <SafeImage src={variant.image} className="w-full h-full object-cover" alt={`Variant ${variant.color}`} />
                  </button>
                ))}
             </div>
@@ -2658,7 +2690,7 @@ const ProductDetailPage = () => {
                    onClick={() => setSelectedImage(i)}
                    className={`flex-shrink-0 w-[60px] h-[60px] md:w-[80px] md:h-[80px] rounded-[12px] overflow-hidden border-2 transition-all duration-300 ${selectedImage === i ? 'border-[#7c3aed] scale-105 shadow-lg shadow-[#7c3aed]/10' : 'border-transparent opacity-70 hover:opacity-100 hover:border-slate-200'}`}
                  >
-                   <img src={img} className="w-full h-full object-cover" alt={`Thumb ${i}`} loading="lazy" />
+                   <SafeImage src={img} className="w-full h-full object-cover" alt={`Thumb ${i}`} />
                  </button>
                ))}
             </div>
@@ -2907,12 +2939,52 @@ const ProductDetailPage = () => {
 
 // Cart Page
 const CartPage = () => {
-  const { cart, total, removeFromCart, updateQuantity, saveForLater, savedForLater, moveToCart, removeFromSaved } = useCart();
-  const [couponCode, setCouponCode] = useState('');
-  const [couponDiscount, setCouponDiscount] = useState(0);
-  const [couponApplied, setCouponApplied] = useState(false);
+    const { cart, total, removeFromCart, updateQuantity, saveForLater, savedForLater, moveToCart, removeFromSaved } = useCart();
+    const [couponCode, setCouponCode] = useState('');
+    const [couponDiscount, setCouponDiscount] = useState(0);
+    const [couponApplied, setCouponApplied] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
 
-  const applyCoupon = async () => {
+    useEffect(() => {
+        const timer = setTimeout(() => setLoading(false), 500);
+        return () => clearTimeout(timer);
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-white pt-[90px]">
+                <div className="flex flex-col items-center gap-6">
+                    <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                    <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Loading Your Cart...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (cart.length === 0) {
+        return (
+            <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="max-w-7xl mx-auto px-4 py-32 text-center"
+            >
+                <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-8">
+                    <ShoppingBag size={40} className="text-slate-300" />
+                </div>
+                <h2 className="text-3xl font-black text-slate-800 mb-4 uppercase tracking-tighter">Your Bag is Empty</h2>
+                <p className="text-slate-500 max-w-sm mx-auto mb-10 font-medium">Looks like you haven't added anything to your cart yet. Explore our latest premium arrivals.</p>
+                <Link 
+                    to="/shop" 
+                    className="inline-block bg-primary text-white px-10 py-5 rounded-2xl font-bold uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 hover:scale-105 transition-transform"
+                >
+                    Start Shopping
+                </Link>
+            </motion.div>
+        );
+    }
+
+    const applyCoupon = async () => {
     if (couponCode.toUpperCase() === 'SAVE10') {
       setCouponDiscount(total * 0.1);
       setCouponApplied(true);

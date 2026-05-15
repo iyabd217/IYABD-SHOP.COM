@@ -12,12 +12,6 @@ class CmsService {
         .download(path);
 
       if (error) {
-        // If file doesn't exist, log and return fallback
-        if (error.message.includes('Object not found')) {
-          console.warn(`CMS: File ${path} not found in bucket ${bucket}. Using fallback.`);
-        } else {
-          console.error(`CMS: Error fetching ${path} from ${bucket}:`, error);
-        }
         return fallback;
       }
 
@@ -25,7 +19,24 @@ class CmsService {
       const text = await data.text();
       return JSON.parse(text) as T;
     } catch (err) {
-      console.error(`CMS: Failed to parse JSON from ${path} in ${bucket}:`, err);
+      return fallback;
+    }
+  }
+
+  /**
+   * Fetches data from a Supabase table.
+   */
+  async getTableData<T>(table: string, fallback: T): Promise<T> {
+    try {
+      const { data, error } = await supabase
+        .from(table)
+        .select('*');
+      
+      if (error) throw error;
+      if (data && data.length > 0) return data as unknown as T;
+      return fallback;
+    } catch (err) {
+      console.warn(`CMS: Failed to fetch from table [${table}]:`, err);
       return fallback;
     }
   }
@@ -42,14 +53,21 @@ class CmsService {
    * Specific wrappers for the requested structure
    */
   async getProducts() {
+    // Try table first
+    const tableData = await this.getTableData<any[]>('products', []);
+    if (tableData.length > 0) return tableData;
     return this.getJSON<any[]>(STORAGE_BUCKETS.productData, 'products.json', []);
   }
 
   async getCategories() {
+    const tableData = await this.getTableData<any[]>('categories', []);
+    if (tableData.length > 0) return tableData;
     return this.getJSON<any[]>(STORAGE_BUCKETS.productData, 'categories.json', []);
   }
 
   async getBanners() {
+    const tableData = await this.getTableData<any[]>('banners', []);
+    if (tableData.length > 0) return tableData;
     return this.getJSON<any[]>(STORAGE_BUCKETS.productData, 'banners.json', []);
   }
 
@@ -63,6 +81,8 @@ class CmsService {
   }
 
   async getAiTraining() {
+    const tableData = await this.getTableData<any[]>('ai_training', []);
+    if (tableData.length > 0) return tableData;
     return this.getJSON<any>(STORAGE_BUCKETS.supportSystem, 'ai-training.json', {
       greetings: {
         assalamualaikum: "ওয়ালাইকুম আসসালাম 🌸 IYABD Support এ আপনাকে স্বাগতম।"
