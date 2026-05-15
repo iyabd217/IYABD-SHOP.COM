@@ -37,7 +37,7 @@ export const adminService = {
     try {
       const q = query(collection(db, path));
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
     }
@@ -85,7 +85,7 @@ export const adminService = {
     try {
       const q = query(collection(db, path));
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -129,7 +129,7 @@ export const adminService = {
     try {
       const q = query(collection(db, path));
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -167,13 +167,104 @@ export const adminService = {
     }
   },
 
+  // Hero Banners (New)
+  async getHeroBanners(activeOnly = false) {
+    const path = 'hero_banners';
+    try {
+      let q = query(collection(db, path), orderBy('sort_order', 'asc'));
+      if (activeOnly) {
+        q = query(collection(db, path), where('is_active', '==', true), orderBy('sort_order', 'asc'));
+      }
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  async addHeroBanner(banner: any) {
+    const path = 'hero_banners';
+    try {
+      const docRef = await addDoc(collection(db, path), {
+        ...banner,
+        created_at: serverTimestamp()
+      });
+      return { id: docRef.id, ...banner };
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, path);
+    }
+  },
+
+  async updateHeroBanner(id: string, banner: any) {
+    const path = `hero_banners/${id}`;
+    try {
+      await updateDoc(doc(db, 'hero_banners', id), { ...banner, updated_at: serverTimestamp() });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  },
+
+  async deleteHeroBanner(id: string) {
+    const path = `hero_banners/${id}`;
+    try {
+      await deleteDoc(doc(db, 'hero_banners', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
+  // Category Banners (New)
+  async getCategoryBanners() {
+    const path = 'category_banners';
+    try {
+      const q = query(collection(db, path), orderBy('sort_order', 'asc'));
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  async addCategoryBanner(category: any) {
+    const path = 'category_banners';
+    try {
+      const docRef = await addDoc(collection(db, path), {
+        ...category,
+        created_at: serverTimestamp()
+      });
+      return { id: docRef.id, ...category };
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, path);
+    }
+  },
+
+  async updateCategoryBanner(id: string, category: any) {
+    const path = `category_banners/${id}`;
+    try {
+      await updateDoc(doc(db, 'category_banners', id), { ...category, updated_at: serverTimestamp() });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  },
+
+  async deleteCategoryBanner(id: string) {
+    const path = `category_banners/${id}`;
+    try {
+      await deleteDoc(doc(db, 'category_banners', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
   // Blogs
   async getBlogPosts() {
     const path = 'blog_posts';
     try {
       const q = query(collection(db, path), orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -217,7 +308,7 @@ export const adminService = {
     try {
       const q = query(collection(db, path), orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -229,7 +320,7 @@ export const adminService = {
     try {
       const q = query(collection(db, path), where('userId', '==', userId), orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -279,14 +370,43 @@ export const adminService = {
   },
 
   // Company Settings
+  async getSupportConfig() {
+    const path = 'config/support';
+    try {
+      const docSnap = await getDoc(doc(db, 'config', 'support'));
+      if (docSnap.exists()) return docSnap.data();
+      return null;
+    } catch (e) {
+      handleFirestoreError(e, OperationType.GET, path);
+      return null;
+    }
+  },
+
+  async updateSupportConfig(config: any) {
+    const path = 'config/support';
+    try {
+      await setDoc(doc(db, 'config', 'support'), { ...config, updatedAt: serverTimestamp() }, { merge: true });
+      await this.logActivity('SUPPORT_CONFIG_UPDATE', 'Updated support configuration');
+      return true;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+      return false;
+    }
+  },
+
   async getCompanySettings() {
     const path = 'config/general';
     try {
       const docSnap = await getDoc(doc(db, 'config', 'general'));
       if (docSnap.exists()) return docSnap.data();
-      return { companyName: 'V°ONE', logo: 'https://v-one.com/logo.png' };
+      return { 
+        companyName: 'IY ABD', 
+        logo: 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?q=80&w=200', 
+        seo_site_title: 'IY ABD Premium' 
+      };
     } catch (error) {
       handleFirestoreError(error, OperationType.GET, path);
+      return { companyName: 'IY ABD', seo_site_title: 'IY ABD Premium' };
     }
   },
 
@@ -322,7 +442,7 @@ export const adminService = {
     try {
       const q = query(collection(db, path), orderBy('timestamp', 'desc'), limit(50));
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
     }
@@ -334,7 +454,7 @@ export const adminService = {
     try {
       const q = query(collection(db, path));
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
     }
@@ -372,6 +492,93 @@ export const adminService = {
     } catch (e) {
       console.error(e);
       return null;
+    }
+  },
+
+  // Uploads
+  async uploadHeroBanners(formData: FormData) {
+    const res = await fetch('/api/admin/hero-banner/upload', {
+      method: 'POST',
+      body: formData
+    });
+    if (!res.ok) throw new Error('Hero banner upload failed');
+    return await res.json();
+  },
+
+  async uploadCategoryBanners(formData: FormData) {
+    const res = await fetch('/api/admin/category/upload', {
+      method: 'POST',
+      body: formData
+    });
+    if (!res.ok) throw new Error('Category banner upload failed');
+    return await res.json();
+  },
+
+  // Flash Sales
+  async getFlashSaleConfig() {
+    const path = 'config/flash_sale';
+    try {
+      const docSnap = await getDoc(doc(db, 'config', 'flash_sale'));
+      return docSnap.exists() ? docSnap.data() : null;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, path);
+    }
+  },
+
+  async updateFlashSaleConfig(config: any) {
+    const path = 'config/flash_sale';
+    try {
+      await setDoc(doc(db, 'config', 'flash_sale'), { ...config, updatedAt: serverTimestamp() }, { merge: true });
+      await this.logActivity('FLASH_SALE_CONFIG_UPDATE', 'Updated flash sale configuration');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  },
+
+  async getFlashSaleProducts() {
+    const path = 'flash_sales';
+    try {
+      const q = query(collection(db, path), orderBy('sort_order', 'asc'));
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  async addFlashSaleProduct(data: any) {
+    const path = 'flash_sales';
+    try {
+      const docRef = await addDoc(collection(db, path), {
+        ...data,
+        is_active: true,
+        created_at: serverTimestamp()
+      });
+      await this.logActivity('FLASH_SALE_PRODUCT_ADD', `Added flash sale product ID: ${docRef.id}`);
+      return docRef.id;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, path);
+    }
+  },
+
+  async updateFlashSaleProduct(id: string, data: any) {
+    const path = `flash_sales/${id}`;
+    try {
+      await updateDoc(doc(db, 'flash_sales', id), { ...data, updatedAt: serverTimestamp() });
+      await this.logActivity('FLASH_SALE_PRODUCT_UPDATE', `Updated flash sale product ID: ${id}`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  },
+
+  async deleteFlashSaleProduct(id: string) {
+    const path = `flash_sales/${id}`;
+    try {
+      await deleteDoc(doc(db, 'flash_sales', id));
+      await this.logActivity('FLASH_SALE_PRODUCT_DELETE', `Deleted flash sale product ID: ${id}`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
     }
   }
 };

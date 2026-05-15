@@ -1,6 +1,6 @@
 {
-  "name": "Lumina Luxe",
-  "description": "A premium, mobile-first eCommerce experience for modern curated lifestyle goods, featuring high-performance design and a powerful admin control center.",
+  "name": "IY ABD Premium",
+  "description": "A high-end, multi-category marketplace with curated products, musical instruments, and premium lifestyle goods. Featuring a dynamic real-time flash sale system, admin marketing controls, and AI-powered product search.",
   "requestFramePermissions": ["camera", "microphone"],
-  "majorCapabilities": []
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

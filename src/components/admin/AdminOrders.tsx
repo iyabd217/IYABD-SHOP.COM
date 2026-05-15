@@ -112,15 +112,17 @@ const AdminOrders = () => {
                                             console.error(err);
                                         }
                                     }}
-                                    className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tight outline-none border-none cursor-pointer ${
+                                     className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tight outline-none border-none cursor-pointer ${
                                         order.shippingStatus === 'DELIVERED' ? 'bg-emerald-50 text-emerald-600' :
                                         order.shippingStatus === 'CANCELLED' ? 'bg-rose-50 text-rose-600' :
-                                        order.shippingStatus === 'SHIPPED' ? 'bg-blue-50 text-blue-600' :
+                                        order.shippingStatus === 'SENT' ? 'bg-blue-50 text-blue-600' :
                                         'bg-amber-50 text-amber-600'
                                     }`}
                                   >
+                                    <option value="PENDING">PENDING</option>
                                     <option value="PROCESSING">PROCESSING</option>
-                                    <option value="SHIPPED">SHIPPED</option>
+                                    <option value="PACKED">PACKED</option>
+                                    <option value="SENT">SENT</option>
                                     <option value="DELIVERED">DELIVERED</option>
                                     <option value="CANCELLED">CANCELLED</option>
                                   </select>
@@ -156,6 +158,67 @@ const AdminOrders = () => {
 
                        {viewMode === 'invoice' && (
                            <div className="p-6 pt-12 overflow-x-auto">
+                              <div className="flex flex-wrap gap-[10px] mb-6 justify-center print:hidden">
+                                 <button 
+                                     onClick={async () => {
+                                         if (!window.confirm('Send to Star Fast Courier?')) return;
+                                         try {
+                                             const trackingId = 'SF' + Math.floor(Math.random() * 1000000);
+                                             await adminService.updateOrder(selectedOrder.id, {
+                                                shippingStatus: 'PROCESSING',
+                                                courierName: 'Star Fast',
+                                                trackingId: trackingId
+                                             });
+                                             alert(`Parcel created! Tracking ID: ${trackingId}`);
+                                             setSelectedOrder({ ...selectedOrder, shippingStatus: 'PROCESSING', courierName: 'Star Fast', trackingId: trackingId });
+                                             fetchData();
+                                         } catch (e) {
+                                             console.error(e);
+                                             alert("Booking failed.");
+                                         }
+                                     }}
+                                     className="bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center transition-colors h-[42px] px-[18px] rounded-[12px] font-semibold"
+                                 >Star Fast Courier</button>
+
+                                 <button 
+                                     onClick={async () => {
+                                         if (!selectedOrder) return;
+                                         try {
+                                             await adminService.updateOrder(selectedOrder.id, { shippingStatus: 'SENT' });
+                                             alert("Parcel Sent successfully!");
+                                             setSelectedOrder({...selectedOrder, shippingStatus: 'SENT'});
+                                             fetchData();
+                                         } catch (e) {
+                                             alert("Failed to send parcel");
+                                         }
+                                     }}
+                                     className="bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center transition-colors h-[42px] px-[18px] rounded-[12px] font-semibold"
+                                 >Send Parcel</button>
+
+                                 <button 
+                                     onClick={() => setViewMode('edit')}
+                                     className="bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center transition-colors h-[42px] px-[18px] rounded-[12px] font-semibold"
+                                 >Edit Invoice</button>
+
+                                 <button 
+                                     onClick={() => {
+                                         document.body.classList.remove('print-a4', 'print-a6');
+                                         document.body.classList.add('print-a4');
+                                         window.print();
+                                     }}
+                                     className="bg-slate-900 hover:bg-black text-white flex items-center justify-center transition-colors h-[42px] px-[18px] rounded-[12px] font-semibold"
+                                 >Print A4</button>
+
+                                 <button 
+                                     onClick={() => {
+                                         document.body.classList.remove('print-a4', 'print-a6');
+                                         document.body.classList.add('print-a6');
+                                         window.print();
+                                     }}
+                                     className="bg-slate-800 hover:bg-black text-white flex items-center justify-center transition-colors h-[42px] px-[18px] rounded-[12px] font-semibold"
+                                 >Print A6</button>
+                              </div>
+
                               <Invoice order={selectedOrder} orderItems={selectedOrder.items || []} companySettings={companySettings} />
                            </div>
                        )}
@@ -175,6 +238,10 @@ const AdminOrders = () => {
                                        <div>
                                            <label className="block text-xs font-bold mb-1">Phone</label>
                                            <input type="text" value={selectedOrder.phone || ''} onChange={e => setSelectedOrder({ ...selectedOrder, phone: e.target.value })} className="w-full p-2 border rounded font-bold text-sm" />
+                                       </div>
+                                       <div>
+                                           <label className="block text-xs font-bold mb-1">Email</label>
+                                           <input type="text" value={selectedOrder.userEmail || selectedOrder.email || ''} onChange={e => setSelectedOrder({ ...selectedOrder, userEmail: e.target.value })} className="w-full p-2 border rounded font-bold text-sm" />
                                        </div>
                                        <div>
                                            <label className="block text-xs font-bold mb-1">Address</label>
@@ -221,6 +288,36 @@ const AdminOrders = () => {
                                            </select>
                                        </div>
                                    </div>
+                               </div>
+
+                               <div className="mb-6 space-y-4">
+                                  <h3 className="font-bold text-gray-500 uppercase text-xs border-b pb-1">Product Details</h3>
+                                  {selectedOrder.items?.map((item: any, i: number) => (
+                                      <div key={i} className="flex flex-wrap gap-4 items-center bg-gray-50 p-3 rounded border">
+                                          <div className="flex-1 min-w-[200px]">
+                                              <label className="block text-[10px] font-bold mb-1">Product Name</label>
+                                              <input type="text" value={item.name} readOnly disabled className="w-full p-1.5 border rounded text-xs bg-gray-100" />
+                                          </div>
+                                          <div className="w-24">
+                                              <label className="block text-[10px] font-bold mb-1">Qty</label>
+                                              <input type="number" min="1" value={item.quantity} onChange={e => {
+                                                  const newItems = selectedOrder.items.map((it: any) => ({...it}));
+                                                  newItems[i].quantity = parseInt(e.target.value) || 1;
+                                                  const newTotal = newItems.reduce((acc: number, it: any) => acc + (it.price * it.quantity), 0) + (selectedOrder.deliveryFee || 0) - (selectedOrder.discount || 0);
+                                                  setSelectedOrder({ ...selectedOrder, items: newItems, total: newTotal, subtotal: newTotal - (selectedOrder.deliveryFee || 0) + (selectedOrder.discount || 0) });
+                                              }} className="w-full p-1.5 border rounded font-bold text-xs" />
+                                          </div>
+                                          <div className="w-32">
+                                              <label className="block text-[10px] font-bold mb-1">Unit Price</label>
+                                              <input type="number" min="0" value={item.price} onChange={e => {
+                                                  const newItems = selectedOrder.items.map((it: any) => ({...it}));
+                                                  newItems[i].price = parseInt(e.target.value) || 0;
+                                                  const newTotal = newItems.reduce((acc: number, it: any) => acc + (it.price * it.quantity), 0) + (selectedOrder.deliveryFee || 0) - (selectedOrder.discount || 0);
+                                                  setSelectedOrder({ ...selectedOrder, items: newItems, total: newTotal, subtotal: newTotal - (selectedOrder.deliveryFee || 0) + (selectedOrder.discount || 0)  });
+                                              }} className="w-full p-1.5 border rounded font-bold text-xs" />
+                                          </div>
+                                      </div>
+                                  ))}
                                </div>
                                
                                <div className="flex justify-end pt-4 border-t gap-3">

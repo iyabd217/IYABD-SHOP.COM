@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
+import { signInWithCustomToken, signOut as signOutFirebase } from 'firebase/auth';
+import { auth } from './firebase';
 import { User } from '@supabase/supabase-js';
 
 interface UserProfile {
@@ -66,7 +68,19 @@ export const AuthProvider = ({ children }: { children: any }) => {
       try {
         const res = await fetch('/api/admin/verify');
         const data = await res.json();
-        setIsAdmin(data.isAdmin);
+        
+        if (data.isAdmin) {
+          const tRes = await fetch('/api/admin/firebase-token');
+          if (tRes.ok) {
+            const tData = await tRes.json();
+            if (tData.token) {
+              await signInWithCustomToken(auth, tData.token);
+            }
+          }
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
       } catch (err) {
         setIsAdmin(false);
       }
@@ -170,6 +184,11 @@ export const AuthProvider = ({ children }: { children: any }) => {
       });
       const data = await res.json();
       if (data.success) {
+        const tRes = await fetch('/api/admin/firebase-token');
+        if (tRes.ok) {
+           const tData = await tRes.json();
+           if (tData.token) await signInWithCustomToken(auth, tData.token);
+        }
         setIsAdmin(true);
         return true;
       }
@@ -183,6 +202,7 @@ export const AuthProvider = ({ children }: { children: any }) => {
   const adminLogout = async () => {
     await fetch('/api/admin/logout', { method: 'POST' });
     setIsAdmin(false);
+    await signOutFirebase(auth).catch(() => {});
   };
 
   return (

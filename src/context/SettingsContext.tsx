@@ -24,6 +24,7 @@ export interface SiteSettings {
     currency: string;
     timezone: string;
     language: string;
+    messenger_link?: string;
     brandSlogan: string;
     brandDescription: string;
     themeColor: string;

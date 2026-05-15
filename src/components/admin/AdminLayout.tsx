@@ -7,7 +7,7 @@ export const AdminLayout = ({ children, toggleSidebar }: { children: React.React
     <div className="admin-layout">
       <Sidebar activeTab="" setActiveTab={() => {}} />
       <div className="admin-main">
-        <AdminHeader toggleSidebar={toggleSidebar} />
+        <AdminHeader toggleSidebar={toggleSidebar} setActiveTab={() => {}} />
         {children}
       </div>
     </div>

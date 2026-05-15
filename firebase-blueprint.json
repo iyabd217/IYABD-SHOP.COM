@@ -25,7 +25,11 @@
         "name": { "type": "string" },
         "slug": { "type": "string" },
         "description": { "type": "string" },
-        "image": { "type": "string" }
+        "image": { "type": "string" },
+        "icon": { "type": "string", "description": "Lucide icon name or image URL" },
+        "redirect_url": { "type": "string" },
+        "sort_order": { "type": "integer" },
+        "active": { "type": "boolean" }
       },
       "required": ["name", "slug"]
     },
@@ -65,7 +69,9 @@
         "heroTitle": { "type": "string" },
         "heroSubtitle": { "type": "string" },
         "heroImage": { "type": "string" },
-        "announcement": { "type": "string" }
+        "announcement": { "type": "string" },
+        "messenger_type": { "type": "string", "enum": ["Messenger", "WhatsApp", "LiveChat"] },
+        "messenger_link": { "type": "string" }
       }
     },
     "Banner": {
@@ -74,9 +80,14 @@
       "type": "object",
       "properties": {
         "title": { "type": "string" },
-        "image": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "image": { "type": "string", "description": "Fallback image" },
+        "mobile_image": { "type": "string" },
+        "desktop_image": { "type": "string" },
+        "button_text": { "type": "string" },
         "link": { "type": "string" },
-        "type": { "type": "string" },
+        "type": { "type": "string", "enum": ["Hero", "Promo", "Popup"] },
+        "sort_order": { "type": "integer" },
         "active": { "type": "boolean" }
       },
       "required": ["title", "image", "type"]
@@ -157,6 +168,67 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["productId", "userId", "userName", "rating", "comment", "isVerified"]
+    },
+    "HeroBanner": {
+      "title": "Hero Banner",
+      "description": "Banners displayed in the hero section.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "banner_image": { "type": "string" },
+        "mobile_banner": { "type": "string" },
+        "desktop_banner": { "type": "string" },
+        "product_images": { "type": "array" },
+        "button_text": { "type": "string" },
+        "redirect_url": { "type": "string" },
+        "is_active": { "type": "boolean" },
+        "sort_order": { "type": "integer" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "CategoryBanner": {
+      "title": "Category Banner",
+      "description": "Banners and info for category slider.",
+      "type": "object",
+      "properties": {
+        "category_name": { "type": "string" },
+        "slug": { "type": "string" },
+        "icon": { "type": "string" },
+        "banner_image": { "type": "string" },
+        "top_banner": { "type": "string" },
+        "is_active": { "type": "boolean" },
+        "sort_order": { "type": "integer" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "FlashSale": {
+      "title": "Flash Sale",
+      "description": "A product on flash sale with discount.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Banner or product title" },
+        "discount_percent": { "type": "number" },
+        "sale_price": { "type": "number" },
+        "old_price": { "type": "number" },
+        "product_image": { "type": "string" },
+        "product_id": { "type": "string" },
+        "start_time": { "type": "string", "format": "date-time" },
+        "end_time": { "type": "string", "format": "date-time" },
+        "is_active": { "type": "boolean" },
+        "sort_order": { "type": "integer" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "FlashSaleConfig": {
+      "title": "Flash Sale Config",
+      "description": "Global settings for flash sale.",
+      "type": "object",
+      "properties": {
+        "banner_url": { "type": "string" },
+        "is_active": { "type": "boolean" },
+        "end_time": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "firestore": {
@@ -168,9 +240,13 @@
     "support_messages": { "schema": "SupportMessage", "description": "Messages from users/guests" },
     "reviews": { "schema": "Review", "description": "Customer reviews for products" },
     "banners": { "schema": "Banner", "description": "Promotional banners" },
+    "hero_banners": { "schema": "HeroBanner", "description": "Hero section banners" },
+    "category_banners": { "schema": "CategoryBanner", "description": "Category slider banners" },
     "brands": { "schema": "Brand", "description": "Associated brands" },
     "blog_posts": { "schema": "BlogPost", "description": "Blog articles" },
     "coupons": { "schema": "Coupon", "description": "Discount coupons" },
-    "activity_logs": { "schema": "ActivityLog", "description": "Admin activity history" }
+    "activity_logs": { "schema": "ActivityLog", "description": "Admin activity history" },
+    "flash_sales": { "schema": "FlashSale", "description": "Flash sale products" },
+    "config/flash_sale": { "schema": "FlashSaleConfig", "description": "Flash sale configuration" }
   }
 }

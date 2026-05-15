@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
 import { SettingsProvider } from './context/SettingsContext.tsx';
 import './index.css';
+import { ErrorBoundary } from './ErrorBoundary.tsx';
 import { initTracking } from './lib/trackingInit';
 
 // Initialize tracking systems
@@ -11,10 +12,12 @@ initTracking();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <SettingsProvider>
-        <App />
-      </SettingsProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <SettingsProvider>
+          <App />
+        </SettingsProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>,
 );

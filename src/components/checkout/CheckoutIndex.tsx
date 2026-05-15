@@ -70,7 +70,7 @@ export default function CheckoutIndex() {
           paymentMethod: formData.paymentMethod,
           deliveryMethod: formData.deliveryMethod,
           deliveryFee,
-          userEmail: formData.email || 'guest@example.com',
+          userEmail: formData.email,
           date: new Date().toISOString()
         };
 
@@ -106,7 +106,7 @@ export default function CheckoutIndex() {
           paymentMethod: formData.paymentMethod,
           deliveryMethod: formData.deliveryMethod,
           deliveryFee,
-          userEmail: formData.email || 'guest@example.com',
+          userEmail: formData.email,
           date: new Date().toISOString()
       };
       

@@ -4,7 +4,8 @@ import { Mail } from 'lucide-react';
 
 export const Invoice = ({ order, orderItems, companySettings }: { order: any, orderItems: any[], companySettings: any }) => {
   return (
-    <div id="invoice-content" className="bg-white text-black max-w-[800px] w-full mx-auto p-5 shadow-sm font-sans relative overflow-hidden break-words align-top selection:bg-black selection:text-white print:m-0 print:p-4 print:shadow-none print:w-[800px] print:min-w-[800px] print:max-w-[800px]">
+    <div id="invoice-section" className="invoice-wrapper" style={{ overflowX: 'hidden' }}>
+      <div className="invoice-container bg-white text-black p-6 sm:p-[30px] shadow-2xl font-sans relative break-words align-top selection:bg-black selection:text-white">
       
       {/* HEADER SECTION */}
       <div className="flex flex-row justify-between items-start mb-3">
@@ -60,24 +61,33 @@ export const Invoice = ({ order, orderItems, companySettings }: { order: any, or
       <div className="h-[2px] bg-black w-full mb-3"></div>
 
       {/* CUSTOMER & ORDER INFORMATION SECTION */}
-      <div className="flex flex-row justify-between items-start gap-4 mb-3">
+      <div className="invoice-top grid grid-cols-2 gap-[30px] mb-3">
         {/* LEFT: Customer Info */}
-        <div className="space-y-0.5 break-words w-1/2 text-left">
+        <div className="customer-info-box space-y-0.5 break-words text-left" style={{ marginTop: '-8px' }}>
           <h3 className="text-[9px] font-black uppercase tracking-widest text-gray-500 border-b border-black pb-0.5 mb-1.5 inline-block">Customer Information</h3>
-          <p className="text-[11px] font-black uppercase break-words">{order?.customerName || 'Customer'}</p>
-          <p className="text-[10px] font-bold text-gray-800 whitespace-nowrap">{order?.phone || 'N/A'}</p>
-          <div className="text-[9px] font-semibold text-gray-600 leading-snug mt-1">
-             <p className="break-words max-w-[200px]">{order?.address || 'N/A'}</p>
-             {(order?.upazila || order?.district || order?.division) && (
-                <p className="text-gray-500 uppercase text-[8px] break-words">
-                  {[order?.upazila, order?.district, order?.division].filter(Boolean).join(', ')}
-                </p>
-             )}
+          <div className="customer-info" style={{ minHeight: '90px', height: 'auto' }}>
+              <p className="text-[11px] font-black uppercase break-words">{order?.customerName || 'Customer'}</p>
+              <p className="text-[10px] font-bold text-gray-800 whitespace-nowrap">{order?.phone || 'N/A'}</p>
+              { (order?.userEmail || order?.email) && (
+                  <div className="customer-email" style={{ fontSize: '13px', color: '#666', marginTop: '3px', wordBreak: 'break-word' }}>
+                      {(order?.userEmail || order?.email).split(',').map((mail: string, idx: number) => (
+                          <div key={idx}>{mail.trim()}</div>
+                      ))}
+                  </div>
+              )}
+              <div className="text-[9px] font-semibold text-gray-600 leading-snug mt-1">
+                 <p className="break-words max-w-[200px]">{order?.address || 'N/A'}</p>
+                 {(order?.upazila || order?.district || order?.division) && (
+                    <p className="text-gray-500 uppercase text-[8px] break-words">
+                      {[order?.upazila, order?.district, order?.division].filter(Boolean).join(', ')}
+                    </p>
+                 )}
+              </div>
           </div>
         </div>
 
         {/* RIGHT: Order Info */}
-        <div className="space-y-0.5 text-right break-words w-1/2 flex flex-col items-end">
+        <div className="space-y-0.5 text-right break-words flex flex-col items-end">
           <h3 className="text-[9px] font-black uppercase tracking-widest text-gray-500 border-b border-black pb-0.5 mb-1.5 inline-block">Order Information</h3>
           <p className="text-[11px] font-black uppercase break-words">Invoice <span className="text-gray-400">#</span>{order?.id?.slice(-8) || 'N/A'}</p>
           <div className="flex justify-end gap-2 font-bold text-[9px] mt-1 text-gray-800">
@@ -179,9 +189,9 @@ export const Invoice = ({ order, orderItems, companySettings }: { order: any, or
       </div>
 
       {/* BOTTOM SECTION: Notes & Terms */}
-      <div className="flex flex-row justify-between items-start gap-4 text-[8px] font-bold leading-relaxed pt-2 border-t-[1px] border-black/10">
+      <div className="grid grid-cols-2 gap-[30px] text-[8px] font-bold leading-relaxed pt-2 border-t-[1px] border-black/10 print-hide-a6">
         {/* Left: Notes (Bengali) */}
-        <div className="text-gray-800 break-words w-1/2 text-left">
+        <div className="text-gray-800 break-words text-left">
            <h4 className="text-[9px] font-black text-black uppercase tracking-widest mb-1.5 border-b border-black/20 pb-0.5 inline-block">Invoice Notes</h4>
            <div className="space-y-0.5 text-gray-700">
              <p className="flex items-start gap-1"><span className="text-black font-black">•</span> <span>দয়া করে পণ্যটি রিসিভ করার সময় ভালো করে চেক করে নিবেন।</span></p>
@@ -191,7 +201,7 @@ export const Invoice = ({ order, orderItems, companySettings }: { order: any, or
         </div>
 
         {/* Right: Terms & Conditions */}
-        <div className="text-gray-800 text-right w-1/2 flex flex-col items-end">
+        <div className="text-gray-800 text-right flex flex-col items-end">
            <h4 className="text-[9px] font-black text-black uppercase tracking-widest mb-1.5 border-b border-black/20 pb-0.5 inline-block">Terms & Conditions</h4>
            <ul className="space-y-0.5 text-gray-700 text-left">
              <li className="flex items-start gap-1"><span>1.</span> <span>Returns are accepted within 3 days (Conditions Apply).</span></li>
@@ -202,10 +212,11 @@ export const Invoice = ({ order, orderItems, companySettings }: { order: any, or
       </div>
 
       {/* THANK YOU BUTTON / FOOTER */}
-      <div className="mt-5 flex flex-col items-center">
+      <div className="mt-5 flex flex-col items-center print-hide-a6">
          <div className="px-5 py-1.5 bg-black text-white rounded-full font-black uppercase text-[9px] tracking-[0.2em] shadow-sm text-center whitespace-nowrap">
             THANK YOU FOR YOUR PURCHASE!
          </div>
+      </div>
       </div>
     </div>
   );

@@ -11,7 +11,8 @@ import {
   where, 
   setDoc,
   serverTimestamp,
-  getDocFromServer
+  getDocFromServer,
+  limit
 } from 'firebase/firestore';
 import { 
   ref, 
@@ -161,25 +162,79 @@ export const storageService = {
 };
 
 export const productService = {
+  async getById(id: string) {
+    const path = `products/${id}`;
+    try {
+      const docRef = doc(db, 'products', id);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        return { id: docSnap.id, ...(docSnap.data() as any) };
+      }
+      return null;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, path);
+      return null;
+    }
+  },
+
   async getAll() {
     const path = 'products';
     try {
       const q = query(collection(db, path));
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
     }
   },
+
+  async list(options: { category?: string; limit?: number } = {}) {
+    const path = 'products';
+    try {
+      let q = collection(db, path) as any;
+      if (options.category) {
+        q = query(q, where('category', '==', options.category));
+      }
+      if (options.limit) {
+        q = query(q, limit(options.limit));
+      }
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  subscribe(options: { category?: string; limit?: number } = {}, callback: (products: any[]) => void) {
+    const path = 'products';
+    let q = collection(db, path) as any;
+    if (options.category) {
+      q = query(q, where('category', '==', options.category));
+    }
+    if (options.limit) {
+      q = query(q, limit(options.limit));
+    }
+    
+    return onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      callback(data);
+    }, (error) => {
+      console.error('Firestore subscribe error: ', error);
+      callback([]); // Return empty array to stop loading
+    });
+  },
   
-  subscribe(callback: (products: any[]) => void) {
+  subscribeAll(callback: (products: any[]) => void) {
     const path = 'products';
     return onSnapshot(collection(db, path), (snapshot) => {
-      const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const products = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
       callback(products);
     }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, path);
+      console.error('Firestore subscribeAll error: ', error);
+      callback([]); // Return empty array to stop loading
+      // Don't throw to ErrorBoundary just for product list reading issues
     });
   },
   
@@ -188,7 +243,7 @@ export const productService = {
     try {
       const q = query(collection(db, path), where('category', '==', category));
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -238,7 +293,7 @@ export const brandService = {
     try {
       const q = query(collection(db, path));
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -265,7 +320,7 @@ export const categoryService = {
     try {
       const q = query(collection(db, path));
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -292,7 +347,7 @@ export const bannerService = {
     try {
       const q = query(collection(db, path));
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -328,7 +383,7 @@ export const orderService = {
     try {
       const q = query(collection(db, path), where('userId', '==', userId));
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -369,7 +424,10 @@ export const configService = {
       if (docSnap.exists()) {
         return docSnap.data();
       }
-      return { heroTitle: 'Curated Luxe Essentials', heroSubtitle: 'Premium living for the modern dwelling.' };
+      return { 
+        heroTitle: 'IY ABD Premium Gear', 
+        heroSubtitle: 'Elevate your performance with our curated collection of musical instruments and luxury goods.' 
+      };
     } catch (error) {
       handleFirestoreError(error, OperationType.GET, path);
     }
@@ -381,6 +439,73 @@ export const configService = {
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
     }
+  },
+  async getSupport() {
+    const path = 'config/support';
+    try {
+      const docSnap = await getDoc(doc(db, 'config', 'support'));
+      if (docSnap.exists()) return docSnap.data();
+      return null;
+    } catch (error) {
+      console.warn("Could not fetch support config", error);
+      return null;
+    }
+  },
+  async updateSupport(config: any) {
+    const path = 'config/support';
+    try {
+      await setDoc(doc(db, 'config', 'support'), config, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
   }
 };
+
+export const flashSaleService = {
+  async getConfig() {
+    const path = 'config/flash_sale';
+    try {
+      const docSnap = await getDoc(doc(db, 'config', 'flash_sale'));
+      return docSnap.exists() ? docSnap.data() : null;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, path);
+      return null;
+    }
+  },
+  
+  subscribeConfig(callback: (config: any) => void) {
+    const path = 'config/flash_sale';
+    return onSnapshot(doc(db, 'config', 'flash_sale'), (snapshot) => {
+      callback(snapshot.exists() ? snapshot.data() : null);
+    }, (error) => {
+      console.error('Firestore subscribeConfig error: ', error);
+      callback(null);
+    });
+  },
+
+  async getProducts() {
+    const path = 'flash_sales';
+    try {
+      const q = query(collection(db, path), where('is_active', '==', true));
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  subscribeProducts(callback: (products: any[]) => void) {
+    const path = 'flash_sales';
+    const q = query(collection(db, path), where('is_active', '==', true));
+    return onSnapshot(q, (snapshot) => {
+      const products = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+      callback(products);
+    }, (error) => {
+      console.error('Firestore subscribeProducts error: ', error);
+      callback([]);
+    });
+  }
+};
+
 

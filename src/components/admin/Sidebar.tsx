@@ -33,14 +33,25 @@ export const Sidebar = ({ activeTab, setActiveTab }: any) => {
       ]
     },
     {
+      title: "Storefront",
+      items: [
+           { icon: "solar:gallery-bold-duotone", label: "Banner Slider", gradient: "from-blue-600 to-indigo-600" },
+           { icon: "solar:clapperboard-edit-bold-duotone", label: "Category Banners", gradient: "from-pink-500 to-rose-500" },
+           { icon: "solar:settings-bold-duotone", label: "Site Settings", gradient: "from-slate-700 to-indigo-600" },
+      ]
+    },
+    {
       title: "Main Control",
       items: [
            { icon: "solar:widget-3-bold-duotone", label: "Dashboard", gradient: "from-blue-500 to-cyan-500" },
+           { icon: "solar:shop-window-bold-duotone", label: "Category Products", gradient: "from-fuchsia-500 to-pink-500" },
            { icon: "solar:bag-bold-duotone", label: "Products", gradient: "from-orange-500 to-yellow-500" },
            { icon: "solar:folder-open-bold-duotone", label: "Categories", gradient: "from-purple-500 to-pink-500" },
            { icon: "solar:box-bold-duotone", label: "Orders", gradient: "from-emerald-500 to-teal-500" },
            { icon: "solar:users-group-rounded-bold-duotone", label: "Customers", gradient: "from-blue-500 to-purple-500" },
+           { icon: "solar:headset-bold-duotone", label: "Messenger Center", gradient: "from-indigo-600 to-purple-600" },
            { icon: "solar:megaphone-bold-duotone", label: "Marketing", gradient: "from-red-500 to-orange-500" },
+           { icon: "solar:bolt-bold-duotone", label: "Flash Sale", gradient: "from-amber-400 to-orange-600" },
            { icon: "solar:tag-horizontal-bold-duotone", label: "Promo Codes", gradient: "from-green-500 to-emerald-500" },
            { icon: "solar:chart-square-bold-duotone", label: "Analytics", gradient: "from-teal-500 to-cyan-500" },
            { icon: "solar:document-text-bold-duotone", label: "Reports", gradient: "from-slate-500 to-blue-500" },
@@ -59,7 +70,7 @@ export const Sidebar = ({ activeTab, setActiveTab }: any) => {
              { icon: "solar:users-group-rounded-bold-duotone", label: "Staff", gradient: "from-gray-500 to-zinc-600" },
              { icon: "solar:globus-bold-duotone", label: "Language", gradient: "from-emerald-400 to-teal-600" },
              { icon: "solar:stars-bold-duotone", label: "AI Manager", gradient: "from-indigo-400 to-purple-600" },
-             { icon: "solar:help-bold-duotone", label: "Help Center", gradient: "from-sky-500 to-purple-500" }
+             { icon: "solar:help-bold-duotone", label: "Support Center Manager", gradient: "from-sky-500 to-purple-500" }
       ]
     }
   ];

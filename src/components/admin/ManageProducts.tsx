@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Plus, Search, Edit, Trash2, MoreVertical, Check, X,
   Filter, Tag, ImageIcon, Video, Box, ArrowLeft, ArrowRight, Save, LayoutGrid, Clock, AlertTriangle, Play, Eye, 
-  Copy, QrCode, Share2, ToggleRight, Archive, EyeOff, Layers, TrendingUp, Zap
+  Copy, QrCode, Share2, ToggleRight, Archive, EyeOff, Layers, TrendingUp, Zap, TrendingDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { productService, storageService, optimizeImage, brandService, categoryService } from '../../lib/services';
@@ -58,18 +58,37 @@ const ManageProducts: React.FC = () => {
         metaTitle: '', 
         metaDescription: '', 
         keywords: '',
-        description: ''
+        description: '',
+        fabric_type: '',
+        gsm: '',
+        fit_type: '',
+        wash_instruction: '',
+        material: '',
+        stretch_type: '',
+        country: '',
+        stitch_quality: ''
     });
 
     const [saving, setSaving] = useState(false);
     const [sizes, setSizes] = useState<string[]>([]);
     const [colors, setColors] = useState<string[]>([]);
+    const [variants, setVariants] = useState<any[]>([]);
     const [sizeInput, setSizeInput] = useState('');
     const [colorInput, setColorInput] = useState('');
 
+    const [variantForm, setVariantForm] = useState({ color: '', image: '', price: '', stock: '', sku: '' });
+    const addVariantToProduct = () => {
+        if (!variantForm.color) return;
+        setVariants([...variants, { ...variantForm }]);
+        setVariantForm({ color: '', image: '', price: '', stock: '', sku: '' });
+    };
+    const removeVariantFromProduct = (idx: number) => {
+        setVariants(variants.filter((_, i) => i !== idx));
+    };
+
     // Initial Fetch (Real-time)
     useEffect(() => {
-        const unsubscribe = productService.subscribe((data) => {
+        const unsubscribe = productService.subscribeAll((data) => {
             setProducts(data);
             setLoading(false);
         });
@@ -158,12 +177,21 @@ const ManageProducts: React.FC = () => {
                     metaTitle: prod.metaTitle || '',
                     metaDescription: prod.metaDescription || '',
                     keywords: prod.keywords || '',
-                    description: prod.description || ''
+                    description: prod.description || '',
+                    fabric_type: prod.fabric_type || '',
+                    gsm: prod.gsm || '',
+                    fit_type: prod.fit_type || '',
+                    wash_instruction: prod.wash_instruction || '',
+                    material: prod.material || '',
+                    stretch_type: prod.stretch_type || '',
+                    country: prod.country || '',
+                    stitch_quality: prod.stitch_quality || ''
                 });
                 setMainImage(prod.image || null);
-                setGalleryImages(prod.gallery || []);
+                setGalleryImages(prod.gallery || prod.gallery_images || []);
                 setSizes(prod.sizes || []);
                 setColors(prod.colors || []);
+                setVariants(prod.variants || []);
                 setShowAddForm(true);
                 break;
             case 'Quick Edit':
@@ -259,13 +287,12 @@ const ManageProducts: React.FC = () => {
         }
     };
 
-    // Stats
     const statsData = [
-      { id: 1, title: 'Total Products', value: (products?.length || 0).toString(), icon: Box, color: 'text-blue-600', bg: 'bg-blue-100' },
-      { id: 2, title: 'Published', value: (products?.filter(p => p.status === 'Published').length || 0).toString(), icon: Check, color: 'text-emerald-600', bg: 'bg-emerald-100' },
-      { id: 3, title: 'Draft', value: (products?.filter(p => p.status === 'Draft' || p.status === 'Archived').length || 0).toString(), icon: Clock, color: 'text-amber-600', bg: 'bg-amber-100' },
-      { id: 4, title: 'Out Of Stock', value: (products?.filter(p => p.stock <= 0).length || 0).toString(), icon: AlertTriangle, color: 'text-rose-600', bg: 'bg-rose-100' },
-      { id: 5, title: 'Low Stock', value: (products?.filter(p => p.stock > 0 && p.stock <= (p.lowStockAlert || 5)).length || 0).toString(), icon: AlertTriangle, color: 'text-orange-600', bg: 'bg-orange-100' },
+      { id: 1, title: 'Total Products', value: (products?.length || 0).toString(), icon: Box, color: 'text-blue-600', iconBg: 'bg-gradient-to-br from-white to-blue-100' },
+      { id: 2, title: 'Published', value: (products?.filter(p => p.status === 'Published').length || 0).toString(), icon: Check, color: 'text-emerald-600', iconBg: 'bg-gradient-to-br from-white to-emerald-100' },
+      { id: 3, title: 'Draft', value: (products?.filter(p => p.status === 'Draft' || p.status === 'Archived' || p.status === 'Hidden').length || 0).toString(), icon: Archive, color: 'text-orange-600', iconBg: 'bg-gradient-to-br from-white to-orange-100' },
+      { id: 4, title: 'Out Of Stock', value: (products?.filter(p => p.stock <= 0).length || 0).toString(), icon: AlertTriangle, color: 'text-rose-600', iconBg: 'bg-gradient-to-br from-white to-rose-100' },
+      { id: 5, title: 'Low Stock', value: (products?.filter(p => p.stock > 0 && p.stock <= (p.lowStockAlert || 5)).length || 0).toString(), icon: TrendingDown, color: 'text-yellow-600', iconBg: 'bg-gradient-to-br from-white to-yellow-100' },
     ];
 
     const addSize = () => {
@@ -340,8 +367,10 @@ const ManageProducts: React.FC = () => {
                 newArrival: formData.newArrival,
                 image: mainImageUrl,
                 gallery: galleryUrls,
+                gallery_images: galleryUrls,
                 sizes,
                 colors,
+                variants,
                 weight: formData.weight,
                 dimensions: formData.dimensions,
                 shippingClass: formData.shippingClass,
@@ -349,6 +378,14 @@ const ManageProducts: React.FC = () => {
                 metaDescription: formData.metaDescription,
                 keywords: formData.keywords,
                 description: formData.description,
+                fabric_type: formData.fabric_type,
+                gsm: formData.gsm,
+                fit_type: formData.fit_type,
+                wash_instruction: formData.wash_instruction,
+                material: formData.material,
+                stretch_type: formData.stretch_type,
+                country: formData.country,
+                stitch_quality: formData.stitch_quality,
                 rating: editingProduct?.rating || 5.0,
                 sold: editingProduct?.sold || 0
             };
@@ -375,7 +412,8 @@ const ManageProducts: React.FC = () => {
                 regularPrice: '', discountPrice: '', tax: '', stockQuantity: '', lowStockAlert: '',
                 active: true, featured: false, bestSeller: false, newArrival: false,
                 weight: '', dimensions: '', shippingClass: 'Standard',
-                metaTitle: '', metaDescription: '', keywords: '', description: ''
+                metaTitle: '', metaDescription: '', keywords: '', description: '',
+                fabric_type: '', gsm: '', fit_type: '', wash_instruction: '', material: '', stretch_type: '', country: '', stitch_quality: ''
             });
             setMainImage(null);
             setMainImageFile(null);
@@ -466,8 +504,8 @@ const ManageProducts: React.FC = () => {
                                     className="w-full bg-slate-50 border border-slate-200 rounded-[12px] px-4 py-3 text-sm focus:outline-none focus:border-[#6D28D9]"
                                 >
                                     <option value="">Select Category</option>
-                                    {categories.map(cat => (
-                                        <option key={cat.id} value={cat.name}>{cat.name}</option>
+                                    {categories.filter(c => !c.parent_id).map(cat => (
+                                        <option key={cat.id} value={cat.id}>{cat.name || cat.category_name}</option>
                                     ))}
                                     {categories.length === 0 && (
                                         <>
@@ -486,9 +524,14 @@ const ManageProducts: React.FC = () => {
                                     className="w-full bg-slate-50 border border-slate-200 rounded-[12px] px-4 py-3 text-sm focus:outline-none focus:border-[#6D28D9]"
                                 >
                                     <option value="">Select Sub Category</option>
-                                    <option value="Men">Men</option>
-                                    <option value="Women">Women</option>
-                                    <option value="Accessories">Accessories</option>
+                                    {categories.filter(c => c.parent_id === formData.category).map(sub => (
+                                        <option key={sub.id} value={sub.id}>{sub.name || sub.category_name}</option>
+                                    ))}
+                                    {(categories.filter(c => c.parent_id === formData.category).length === 0 && !formData.category) && (
+                                        <>
+                                           <option disabled>Select a Category first</option>
+                                        </>
+                                    )}
                                 </select>
                             </div>
                             <div>
@@ -646,6 +689,97 @@ const ManageProducts: React.FC = () => {
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Product Variants Data */}
+                    <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-100 space-y-5">
+                       <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3 flex items-center gap-2">Add Product Variants</h3>
+                       <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+                           <div>
+                               <label className="block text-xs font-semibold text-slate-700 mb-1">Color Name</label>
+                               <input type="text" value={variantForm.color} onChange={e => setVariantForm({...variantForm, color: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm" placeholder="e.g. Red" />
+                           </div>
+                           <div>
+                               <label className="block text-xs font-semibold text-slate-700 mb-1">Variant Image URL</label>
+                               <input type="text" value={variantForm.image} onChange={e => setVariantForm({...variantForm, image: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm" placeholder="URL" />
+                           </div>
+                           <div>
+                               <label className="block text-xs font-semibold text-slate-700 mb-1">Price</label>
+                               <input type="number" value={variantForm.price} onChange={e => setVariantForm({...variantForm, price: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm" placeholder="0" />
+                           </div>
+                           <div>
+                               <label className="block text-xs font-semibold text-slate-700 mb-1">Stock</label>
+                               <input type="number" value={variantForm.stock} onChange={e => setVariantForm({...variantForm, stock: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm" placeholder="0" />
+                           </div>
+                           <button onClick={(e) => { e.preventDefault(); addVariantToProduct(); }} className="px-4 py-2 rounded-lg bg-[#6D28D9] text-white text-sm font-bold hover:bg-[#5b21b6] transition-colors h-[38px]">
+                               Add Variant
+                           </button>
+                       </div>
+                       {variants.length > 0 && (
+                           <div className="mt-4 border border-slate-200 rounded-xl overflow-hidden">
+                               <table className="w-full text-left text-sm">
+                                   <thead className="bg-slate-50 text-slate-600">
+                                       <tr>
+                                           <th className="p-3">Color</th>
+                                           <th className="p-3">Image URL</th>
+                                           <th className="p-3">Price</th>
+                                           <th className="p-3">Stock</th>
+                                           <th className="p-3">Action</th>
+                                       </tr>
+                                   </thead>
+                                   <tbody>
+                                       {variants.map((v, i) => (
+                                           <tr key={i} className="border-b border-slate-100 last:border-0">
+                                               <td className="p-3 font-semibold">{v.color}</td>
+                                               <td className="p-3 truncate max-w-[150px]">{v.image}</td>
+                                               <td className="p-3">{v.price}</td>
+                                               <td className="p-3">{v.stock}</td>
+                                               <td className="p-3"><button onClick={(e) => { e.preventDefault(); removeVariantFromProduct(i); }} className="text-red-500 hover:text-red-700"><Trash2 size={16}/></button></td>
+                                           </tr>
+                                       ))}
+                                   </tbody>
+                               </table>
+                           </div>
+                       )}
+                    </div>
+
+                    {/* Fabric & Material Details */}
+                    <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-100 space-y-5">
+                       <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3 flex items-center gap-2"><Box size={18}/> Fabric & Material Details</h3>
+                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Fabric Type</label>
+                                <input type="text" value={formData.fabric_type} onChange={e => setFormData({...formData, fabric_type: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[12px] px-4 py-3 text-sm focus:outline-none focus:border-[#6D28D9]" placeholder="Premium Cotton" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">GSM</label>
+                                <input type="text" value={formData.gsm} onChange={e => setFormData({...formData, gsm: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[12px] px-4 py-3 text-sm focus:outline-none focus:border-[#6D28D9]" placeholder="250 GSM" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Material</label>
+                                <input type="text" value={formData.material} onChange={e => setFormData({...formData, material: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[12px] px-4 py-3 text-sm focus:outline-none focus:border-[#6D28D9]" placeholder="100% Organic" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Fit Type</label>
+                                <input type="text" value={formData.fit_type} onChange={e => setFormData({...formData, fit_type: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[12px] px-4 py-3 text-sm focus:outline-none focus:border-[#6D28D9]" placeholder="Regular Fit" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Wash Instruction</label>
+                                <input type="text" value={formData.wash_instruction} onChange={e => setFormData({...formData, wash_instruction: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[12px] px-4 py-3 text-sm focus:outline-none focus:border-[#6D28D9]" placeholder="Machine Wash" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Stretch Type</label>
+                                <input type="text" value={formData.stretch_type} onChange={e => setFormData({...formData, stretch_type: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[12px] px-4 py-3 text-sm focus:outline-none focus:border-[#6D28D9]" placeholder="Medium Stretch" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Country of Origin</label>
+                                <input type="text" value={formData.country} onChange={e => setFormData({...formData, country: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[12px] px-4 py-3 text-sm focus:outline-none focus:border-[#6D28D9]" placeholder="Imported" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Stitch Quality</label>
+                                <input type="text" value={formData.stitch_quality} onChange={e => setFormData({...formData, stitch_quality: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[12px] px-4 py-3 text-sm focus:outline-none focus:border-[#6D28D9]" placeholder="Double Needled" />
+                            </div>
+                       </div>
                     </div>
 
                     {/* Shipping */}
@@ -864,22 +998,19 @@ const ManageProducts: React.FC = () => {
 
     return (
         <div className="w-full h-full p-4 sm:p-6 pb-24 font-['Poppins',sans-serif]">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 hidden sm:flex">
+            {/* Header (Desktop + Mobile Unified) */}
+            <div className="flex items-center justify-between mb-4 mt-2 sm:mt-0">
                 <div>
-                   <h2 className="text-2xl font-bold text-slate-800">Products List</h2>
-                   <p className="text-sm text-slate-500">Manage your store products and inventory</p>
+                   <h2 className="text-xl sm:text-2xl font-bold text-slate-800">Products</h2>
+                   <p className="hidden sm:block text-sm text-slate-500">Manage your store products and inventory</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <button className="flex items-center gap-2 px-5 py-3 rounded-[16px] bg-white border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-colors shadow-sm">
+                <div className="hidden sm:flex items-center gap-3">
+                    <button className="flex items-center gap-2 px-5 py-2.5 rounded-[12px] bg-white border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-colors shadow-sm">
                         Export
-                    </button>
-                    <button className="flex items-center gap-2 px-5 py-3 rounded-[16px] bg-white border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-colors shadow-sm">
-                        Import
                     </button>
                     <button 
                         onClick={() => setShowAddForm(true)}
-                        className="flex items-center justify-center gap-2 text-white px-6 py-3 rounded-[16px] font-semibold text-sm shadow-md hover:opacity-90 transition-all"
+                        className="flex items-center justify-center gap-2 text-white px-6 py-2.5 rounded-[12px] font-semibold text-sm shadow-md hover:opacity-90 transition-all"
                         style={{ background: '#6D28D9' }}
                     >
                         <Plus size={18} strokeWidth={2.5} /> Add Product
@@ -887,63 +1018,52 @@ const ManageProducts: React.FC = () => {
                 </div>
             </div>
 
-            {/* Mobile Header Equivalent */}
-            <div className="sm:hidden space-y-4 mb-6">
-                 <div className="flex items-center justify-between">
-                   <h2 className="text-xl font-bold text-slate-800">Products</h2>
-                </div>
-                <div className="relative w-full">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input 
-                        type="text" 
-                        placeholder="Search Products..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-[16px] text-sm focus:outline-none focus:border-[#6D28D9] transition-all shadow-sm"
-                    />
-                </div>
-            </div>
-
             {/* Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+            <div className="flex flex-wrap gap-[10px] mb-6">
                 {statsData.map(stat => (
-                    <div key={stat.id} className="bg-white p-5 rounded-[24px] shadow-[0_10px_30px_rgba(0,0,0,0.04)] border border-slate-100 flex flex-col items-start gap-4">
-                        <div className={`p-3 rounded-full ${stat.bg} ${stat.color}`}>
-                            <stat.icon size={20} />
+                    <div key={stat.id} className="bg-white p-[10px] rounded-[18px] shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-slate-100/60 flex flex-col justify-between h-[78px] md:h-[90px] relative overflow-hidden group hover:shadow-md transition-shadow w-[48%] md:w-[23%] flex-grow">
+                        <div className="flex flex-col h-full justify-between">
+                            <div className={`w-6 h-6 rounded-full ${stat.iconBg} ${stat.color} flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.05),inset_0_1px_2px_rgba(255,255,255,1)] mb-1`}>
+                                 <stat.icon size={12} className="drop-shadow-sm" />
+                            </div>
+                            <div className="flex items-end justify-between">
+                                <h3 className="text-[22px] font-bold text-slate-800 leading-none tracking-tight">{stat.value}</h3>
+                                <div className="absolute right-3 top-3 opacity-10">
+                                     <stat.icon size={36} />
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <p className="text-2xl font-bold text-slate-800">{stat.value}</p>
-                            <p className="text-xs font-semibold text-slate-500 mt-0.5">{stat.title}</p>
-                        </div>
+                        <p className="text-[12px] font-medium text-slate-500 leading-none mt-1 z-10">{stat.title}</p>
                     </div>
                 ))}
             </div>
 
-            {/* Filter Section */}
-            <div className="bg-white rounded-[24px] p-4 mb-6 border border-slate-100 shadow-[0_10px_30px_rgba(0,0,0,0.04)] flex flex-col md:flex-row gap-4 justify-between items-center">
-                 <div className="relative w-full md:w-96 hidden md:block">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            {/* Compact Actions Row: Search & Filters */}
+            <div className="flex flex-col sm:flex-row gap-3 w-full mb-6">
+                <div className="relative flex-1 bg-white border border-slate-200/80 rounded-[14px] shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-all focus-within:shadow-md focus-within:border-purple-300">
+                    <Search className="absolute left-[14px] top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                     <input 
                         type="text" 
-                        placeholder="Search Products..." 
+                        placeholder="Search product name or SKU..." 
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-[12px] text-sm focus:outline-none focus:border-[#6D28D9] transition-all"
+                        className="w-full pl-[40px] pr-4 h-[42px] bg-transparent rounded-[14px] text-[14px] focus:outline-none transition-all font-medium placeholder:text-slate-400"
                     />
                 </div>
-                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                     <select className="flex-1 md:flex-none w-full md:w-auto bg-slate-50 border border-slate-200 rounded-[12px] px-4 py-2.5 text-sm outline-none text-slate-600 font-medium">
-                        <option>Category Filter</option>
-                     </select>
-                     <select className="flex-1 md:flex-none w-full md:w-auto bg-slate-50 border border-slate-200 rounded-[12px] px-4 py-2.5 text-sm outline-none text-slate-600 font-medium">
-                        <option>Status Filter</option>
-                     </select>
-                     <select className="flex-1 md:flex-none w-full md:w-auto bg-slate-50 border border-slate-200 rounded-[12px] px-4 py-2.5 text-sm outline-none text-slate-600 font-medium">
-                        <option>Stock Filter</option>
-                     </select>
-                     <button className="flex-1 md:flex-none w-full md:w-auto flex items-center justify-center gap-2 bg-slate-900 text-white px-6 py-2.5 rounded-[12px] text-sm font-semibold hover:bg-slate-800 transition-colors">
-                        <Filter size={16} /> Filter
-                     </button>
+                
+                <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 sm:pb-0">
+                    <select className="bg-white border border-slate-200/80 rounded-[12px] px-3 h-[42px] text-[13px] outline-none text-slate-600 font-medium focus:border-purple-500 transition-all shadow-sm appearance-none min-w-[120px]">
+                        <option value="">All Categories</option>
+                        {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    </select>
+                    <select className="bg-white border border-slate-200/80 rounded-[12px] px-3 h-[42px] text-[13px] outline-none text-slate-600 font-medium focus:border-purple-500 transition-all shadow-sm appearance-none min-w-[100px]">
+                        <option value="">Status</option>
+                        <option value="Published">Active</option>
+                        <option value="Draft">Draft</option>
+                    </select>
+                    <button className="h-[42px] px-4 flex items-center justify-center gap-2 bg-slate-900 text-white rounded-[12px] text-[13px] font-bold hover:bg-slate-800 transition-colors shadow-sm whitespace-nowrap">
+                        <Filter size={14} /> Filter
+                    </button>
                 </div>
             </div>
 
@@ -1278,10 +1398,9 @@ const ManageProducts: React.FC = () => {
         {/* Floating Add Button for Mobile */}
             <button 
                 onClick={() => setShowAddForm(true)}
-                className="md:hidden fixed bottom-24 right-5 w-14 h-14 rounded-full text-white shadow-xl shadow-[#6D28D9]/30 flex items-center justify-center active:scale-95 transition-transform z-40"
-                style={{ background: '#6D28D9' }}
+                className="md:hidden fixed bottom-[20px] right-[18px] w-[56px] h-[56px] rounded-full text-white shadow-lg shadow-purple-600/30 flex items-center justify-center active:scale-95 transition-transform z-40 bg-gradient-to-br from-[#6D28D9] to-[#8B5CF6]"
             >
-                <Plus size={24} strokeWidth={2.5} />
+                <Plus size={24} strokeWidth={2.5} className="drop-shadow-sm" />
             </button>
         </div>
     );
