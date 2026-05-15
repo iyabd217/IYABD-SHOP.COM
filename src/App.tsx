@@ -402,7 +402,7 @@ const ProductCard = ({ product }: any) => {
     <Link to={`/product/${product.id}`} className="marketplace-card group block overflow-hidden hover:-translate-y-[3px] hover:shadow-lg transition-all duration-300" style={{ transition: '0.3s ease' }}>
       <div className="aspect-square bg-slate-50 relative">
         <img 
-          src={optimizeImg(product.image, { width: 400 })} 
+          src={optimizeImg(product?.image || product?.product_image || 'https://images.unsplash.com/photo-1555529733-0e670560f8e1?q=80&w=400&fit=crop', { width: 400 })} 
           alt={product.name}
           loading="lazy"
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
@@ -718,7 +718,7 @@ const FeaturedProductHeader = ({ product }: any) => {
             className="w-full h-full relative"
           >
              <img 
-               src={product.image} 
+               src={product?.image || product?.product_image || 'https://images.unsplash.com/photo-1555529733-0e670560f8e1?q=80&w=100&fit=crop'} 
                className="w-full h-full object-contain drop-shadow-[0_50px_50px_rgba(255,255,255,0.2)] z-10 relative"
                alt={product.name}
              />
@@ -838,7 +838,7 @@ const YouTubePromoSlider = () => {
               className="absolute inset-0"
             >
               <img 
-                src={optimizeImg(banner.image_url, { width: 2560, height: 1440 })} 
+                src={optimizeImg(banner?.image_url || banner?.banner_url || banner?.banner_image || banner?.image || 'https://images.unsplash.com/photo-1555529733-0e670560f8e1?q=80&w=2560&fit=crop', { width: 2560, height: 1440 })} 
                 className="w-full h-full object-cover"
                 alt={banner.title}
               />
@@ -1129,7 +1129,7 @@ const ShopPage = () => {
           className="relative w-full aspect-video md:aspect-[16/5] rounded-[32px] overflow-hidden mb-8 shadow-xl border border-slate-100"
         >
           <img 
-            src={optimizeImg(activeCategoryData.banner_url, { width: 1600, height: 600 })} 
+            src={optimizeImg(activeCategoryData?.banner_url || activeCategoryData?.banner_image || 'https://images.unsplash.com/photo-1555529733-0e670560f8e1?q=80&w=1600&fit=crop', { width: 1600, height: 600 })} 
             className="w-full h-full object-cover" 
             alt={activeCategoryData.name} 
           />

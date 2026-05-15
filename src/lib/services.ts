@@ -136,14 +136,24 @@ export const storageService = {
         const timestamp = Date.now();
         const extension = 'webp';
         const fileName = index !== undefined ? `image_${index}_${timestamp}.${extension}` : `main_${timestamp}.${extension}`;
-        const filePath = `products/${productId}/${fileName}`;
-        const storageRef = ref(storage, filePath);
+        const filePath = `${productId}/${fileName}`;
         
         try {
-            await uploadBytes(storageRef, file);
-            const downloadUrl = await getDownloadURL(storageRef);
+            const { supabase } = await import('./supabaseClient');
+            const { STORAGE_BUCKETS } = await import('./supabaseStorage');
+            
+            const { data, error } = await supabase.storage
+              .from(STORAGE_BUCKETS.products)
+              .upload(filePath, file, { upsert: true });
+              
+            if (error) throw error;
+            
+            const { data: publicData } = supabase.storage
+              .from(STORAGE_BUCKETS.products)
+              .getPublicUrl(filePath);
+
             return {
-                url: downloadUrl,
+                url: publicData.publicUrl,
                 path: filePath
             };
         } catch (error) {
@@ -152,10 +162,49 @@ export const storageService = {
         }
     },
 
-    async deleteFile(path: string) {
-        const storageRef = ref(storage, path);
+    async uploadBannerImage(file: File | Blob) {
+        const timestamp = Date.now();
+        const fileName = `banner_${timestamp}.webp`;
         try {
-            await deleteObject(storageRef);
+            const { supabase } = await import('./supabaseClient');
+            const { STORAGE_BUCKETS } = await import('./supabaseStorage');
+            const { error } = await supabase.storage.from(STORAGE_BUCKETS.banners).upload(fileName, file, { upsert: true });
+            if (error) throw error;
+            const { data: publicData } = supabase.storage.from(STORAGE_BUCKETS.banners).getPublicUrl(fileName);
+            return publicData.publicUrl;
+        } catch(e) { throw e; }
+    },
+
+    async uploadCategoryImage(file: File | Blob) {
+        const timestamp = Date.now();
+        const fileName = `category_${timestamp}.webp`;
+        try {
+            const { supabase } = await import('./supabaseClient');
+            const { STORAGE_BUCKETS } = await import('./supabaseStorage');
+            const { error } = await supabase.storage.from(STORAGE_BUCKETS.categories).upload(fileName, file, { upsert: true });
+            if (error) throw error;
+            const { data: publicData } = supabase.storage.from(STORAGE_BUCKETS.categories).getPublicUrl(fileName);
+            return publicData.publicUrl;
+        } catch(e) { throw e; }
+    },
+
+    async uploadBrandImage(file: File | Blob) {
+        const timestamp = Date.now();
+        const fileName = `brand_${timestamp}.webp`;
+        try {
+            const { supabase } = await import('./supabaseClient');
+            const { STORAGE_BUCKETS } = await import('./supabaseStorage');
+            const { error } = await supabase.storage.from(STORAGE_BUCKETS.brands).upload(fileName, file, { upsert: true });
+            if (error) throw error;
+            const { data: publicData } = supabase.storage.from(STORAGE_BUCKETS.brands).getPublicUrl(fileName);
+            return publicData.publicUrl;
+        } catch(e) { throw e; }
+    },
+
+    async deleteFile(path: string, bucketName: string = 'products') {
+        try {
+            const { supabase } = await import('./supabaseClient');
+            await supabase.storage.from(bucketName).remove([path]);
         } catch (error) {
             console.warn("Storage Delete Warning:", error);
         }
@@ -164,17 +213,18 @@ export const storageService = {
 
 export const productService = {
   async getAll() {
-    // Try CMS first, then Firestore
-    const cmsProducts = await cmsService.getProducts();
-    if (cmsProducts && cmsProducts.length > 0) {
-      return cmsProducts;
-    }
-
     const path = 'products';
     try {
       const q = query(collection(db, path));
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+      const docs = querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+      
+      // Fallback to CMS if Firestore is empty
+      if (docs.length === 0) {
+        const cmsProducts = await cmsService.getProducts();
+        if (cmsProducts && cmsProducts.length > 0) return cmsProducts;
+      }
+      return docs;
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -234,27 +284,21 @@ export const productService = {
   },
   
   subscribeAll(callback: (products: any[]) => void) {
-    // Try CMS first
-    cmsService.getProducts().then(cmsProducts => {
-       if (cmsProducts && cmsProducts.length > 0) {
-          callback(cmsProducts);
-       } else {
-          // Fallback to Firestore
-          const path = 'products';
-          onSnapshot(collection(db, path), (snapshot) => {
-            const products = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
-            callback(products);
-          }, (error) => {
-            console.error('Firestore subscribeAll error: ', error);
-            callback([]); 
-          });
-       }
-    }).catch(e => {
-       console.error("CMS failed", e);
-       callback([]);
+    const path = 'products';
+    return onSnapshot(collection(db, path), (snapshot) => {
+      const products = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+      if (products.length === 0) {
+        cmsService.getProducts().then(cmsProducts => {
+           if (cmsProducts && cmsProducts.length > 0) callback(cmsProducts);
+           else callback([]);
+        });
+      } else {
+        callback(products);
+      }
+    }, (error) => {
+      console.error('Firestore subscribeAll error: ', error);
+      callback([]); 
     });
-    
-    return () => {}; // return dummy unsubscribe
   },
   
   async getByCategory(category: string) {

@@ -55,22 +55,35 @@ async function startServer() {
   const storage = multer.memoryStorage();
   const upload = multer({ storage });
 
-  // Helper for Sharp Optimization
-  const optimizeImage = async (req: any, buffer: Buffer, folder: string, width = 1200, quality = 80) => {
+  // Helper for Sharp Optimization + Supabase Upload
+  const optimizeImage = async (req: any, buffer: Buffer, bucket: string, width = 1200, quality = 80) => {
     const filename = `${Date.now()}-${Math.round(Math.random() * 1E9)}.webp`;
-    const uploadDir = path.join(process.cwd(), "uploads", folder);
-    await fs.mkdir(uploadDir, { recursive: true });
-    const filepath = path.join(uploadDir, filename);
     
-    await sharp(buffer)
+    // Optimize with Sharp
+    const optimizedBuffer = await sharp(buffer)
       .resize(width)
       .webp({ quality })
-      .toFile(filepath);
+      .toBuffer();
       
-    // Generate Full URL
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-    const host = req.get('host');
-    return `${protocol}://${host}/uploads/${folder}/${filename}`;
+    // Upload to Supabase Storage
+    const { data: uploadData, error } = await supabase.storage
+      .from(bucket)
+      .upload(filename, optimizedBuffer, {
+        contentType: 'image/webp',
+        upsert: true
+      });
+      
+    if (error) {
+      console.error(`Supabase Upload Error to bucket [${bucket}]:`, error);
+      throw error;
+    }
+      
+    // Return Public URL
+    const { data } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(filename);
+      
+    return data.publicUrl;
   };
 
   // Hero Banner Upload API
