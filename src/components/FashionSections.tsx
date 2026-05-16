@@ -5,6 +5,7 @@ import { Swiper, SwiperSlide } from 'swiper/react';
 import { FreeMode, Autoplay } from 'swiper/modules';
 import { Heart, Star, ShoppingBag } from 'lucide-react';
 import { productService } from '../lib/services';
+import { useQuery } from '@tanstack/react-query';
 
 const DEMO_FASHION = {
   'polo-shirt': [
@@ -111,59 +112,66 @@ export const FashionProductCard = ({ product }: { product: any }) => {
 };
 
 export const FashionSectionGroup = ({ title, slug }: { title: string, slug: string }) => {
-  const [products, setProducts] = useState<any[]>(DEMO_FASHION[slug as keyof typeof DEMO_FASHION] || []);
-  const [banners, setBanners] = useState<any[]>([]);
-
-  useEffect(() => {
-    // We subscribe so that when admin changes products, it updates instantly.
-    const unsubscribe = productService.subscribe({ category: slug, limit: 10 }, (data) => {
-      if (data && data.length > 0) setProducts(data);
-      else setProducts(DEMO_FASHION[slug as keyof typeof DEMO_FASHION] || []);
-    });
-    return () => unsubscribe();
-  }, [slug]);
-
-  useEffect(() => {
-    // Fetch banners specifically for this category
-    const fetchBanners = async () => {
-      try {
-        const allBanners = await import('../../src/lib/adminServices').then(m => m.adminService.getCategoryBanners());
-        const categoryBanners = (allBanners || []).filter((b: any) => 
-            b.is_active !== false && 
-            (b.category_slug?.toLowerCase().trim() === slug?.toLowerCase().trim() ||
-             b.category_slug?.toLowerCase().trim() === slug?.replace('-', '')?.toLowerCase().trim() ||
-             b.category_name?.toLowerCase().trim() === title?.toLowerCase().trim() ||
-             b.category_name?.toLowerCase().trim() === slug?.toLowerCase().trim() ||
-             title?.toLowerCase().trim().includes(b.category_name?.toLowerCase().trim() || 'XYZXYZ'))
-        );
-        
-        if (categoryBanners.length === 0) {
-           const fallbackDemos = [
-             { category_slug: 'women-fashion', banner_title: 'NEW WOMEN COLLECTION', banner_subtitle: 'UP TO 50% OFF', banner_image: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=1200&h=675&fit=crop' },
-             { category_slug: 'punjabi', banner_title: 'PREMIUM PANJABI COLLECTION', banner_subtitle: 'Explore the latest styles', banner_image: 'https://images.unsplash.com/photo-1596455607563-ad6193f76b17?w=1200&h=675&fit=crop' },
-             { category_slug: 'tshirt', banner_title: 'SUMMER T-SHIRT SALE', banner_subtitle: 'Stay cool', banner_image: 'https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?w=1200&h=675&fit=crop' }
-           ];
-           const matchedFallback = fallbackDemos.filter(b => b.category_slug === slug || b.category_slug === slug.replace('-', ''));
-           setBanners(matchedFallback as any[]);
-        } else {
-           setBanners(categoryBanners);
-        }
-      } catch (err) {
-        console.error("Failed to load category banners", err);
+  const { data: products = [], isLoading: pLoading } = useQuery({
+    queryKey: ['fashionSection', slug],
+    queryFn: async () => {
+      let data = await productService.list({ category: slug, limit: 12 });
+      if (!data || data.length === 0) {
+        data = DEMO_FASHION[slug as keyof typeof DEMO_FASHION] || [];
       }
-    };
-    fetchBanners();
-  }, [slug, title]);
+      return data;
+    },
+    staleTime: 1000 * 60 * 5 // Cache for 5 minutes
+  });
+
+  const { data: banners = [], isLoading: bLoading } = useQuery({
+    queryKey: ['categoryBanners', slug],
+    queryFn: async () => {
+      const allBanners = await import('../../src/lib/adminServices').then(m => m.adminService.getCategoryBanners());
+      const categoryBanners = (allBanners || []).filter((b: any) => 
+          b.is_active !== false && 
+          (b.category_slug?.toLowerCase().trim() === slug?.toLowerCase().trim() ||
+           b.category_slug?.toLowerCase().trim() === slug?.replace('-', '')?.toLowerCase().trim() ||
+           b.category_name?.toLowerCase().trim() === title?.toLowerCase().trim() ||
+           b.category_name?.toLowerCase().trim() === slug?.toLowerCase().trim() ||
+           title?.toLowerCase().trim().includes(b.category_name?.toLowerCase().trim() || 'XYZXYZ'))
+      );
+      
+      if (categoryBanners.length === 0) {
+         const fallbackDemos = [
+           { id: '1', category_slug: 'women-fashion', banner_title: 'NEW WOMEN COLLECTION', banner_subtitle: 'UP TO 50% OFF', banner_image: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=1200&h=675&fit=crop' },
+           { id: '2', category_slug: 'punjabi', banner_title: 'PREMIUM PANJABI COLLECTION', banner_subtitle: 'Explore the latest styles', banner_image: 'https://images.unsplash.com/photo-1596455607563-ad6193f76b17?w=1200&h=675&fit=crop' },
+           { id: '3', category_slug: 'tshirt', banner_title: 'SUMMER T-SHIRT SALE', banner_subtitle: 'Stay cool', banner_image: 'https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?w=1200&h=675&fit=crop' }
+         ];
+         const matchedFallback = fallbackDemos.filter(b => b.category_slug === slug || b.category_slug === slug.replace('-', ''));
+         return matchedFallback as any[];
+      }
+      return categoryBanners;
+    },
+    staleTime: 1000 * 60 * 15 // Cache for 15 minutes
+  });
+
+  if (pLoading) {
+    return (
+      <section className="category-section mb-14 px-4 overflow-hidden">
+        <div className="category-header mb-6">
+          <h2 className="text-xl md:text-2xl font-bold text-slate-800 animate-pulse bg-slate-200 h-8 max-w-[200px] rounded-lg"></h2>
+        </div>
+        <div className="product-slider">
+          {[1,2,3,4].map(i => (
+            <div key={i} className="min-w-[160px] md:min-w-[220px] aspect-[4/5] bg-slate-100 animate-pulse rounded-[24px]"></div>
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   if (!products || products.length === 0) {
-    // fallback if no demo either
     return null;
   }
 
-  // Generate banners logic
-  // We'll slide them if there are multiple. For simplicity, just use the first active banner if multiple, or a basic swiper.
   return (
-    <section className="category-section mb-14 px-4 overflow-hidden">
+    <section className="category-section mb-14 px-4 overflow-hidden relative">
       <div className="category-header flex flex-row justify-between items-center mb-6">
         <div>
           <h2 className="text-xl md:text-2xl font-bold text-slate-800">{title}</h2>
@@ -202,25 +210,12 @@ export const FashionSectionGroup = ({ title, slug }: { title: string, slug: stri
          </div>
       )}
 
-      <div className="products-slider mt-[10px]">
-        <Swiper
-          modules={[FreeMode]}
-          slidesPerView={2}
-          spaceBetween={14}
-          freeMode={true}
-          grabCursor={true}
-          breakpoints={{
-            768: { slidesPerView: 3, spaceBetween: 16 },
-            1024: { slidesPerView: 5, spaceBetween: 20 }
-          }}
-          className="!overflow-visible !pb-4"
-        >
-          {products?.map((product) => (
-            <SwiperSlide key={product.id}>
-              <FashionProductCard product={product} />
-            </SwiperSlide>
-          ))}
-        </Swiper>
+      <div className="product-slider pt-2 pb-4">
+        {products?.map((product) => (
+          <div key={product.id} className="min-w-[160px] md:min-w-[220px] w-[160px] md:w-[220px] flex-shrink-0">
+            <FashionProductCard product={product} />
+          </div>
+        ))}
       </div>
     </section>
   );

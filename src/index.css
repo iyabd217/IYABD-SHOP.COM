@@ -40,11 +40,27 @@
 }
 
 @layer base {
+  * {
+    box-sizing: border-box;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100%;
+    touch-action: pan-y;
+  }
+  #root {
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100%;
+  }
   body {
     @apply bg-[#F3F4F6] text-slate-900 font-sans antialiased;
-    overflow-x: hidden;
   }
 }
+
 
 @layer components {
   .admin-layout {
@@ -535,17 +551,31 @@ body {
    justify-content: center;
 }
 
-.cart-count {
-   position: absolute;
-   top: 4px;
-   right: 0;
-   width: 18px;
-   height: 18px;
-   border-radius: 50%;
-   background: #7c3aed;
-   color: #fff;
-   font-size: 10px;
-   display: flex;
-   align-items: center;
-   justify-content: center;
+
+/* Fixes for live deployment rendering */
+.app-wrapper {
+  width: 100%;
+  overflow-x: hidden;
+  position: relative;
 }
+
+img {
+  max-width: 100%;
+}
+
+section {
+  overflow: hidden;
+}
+
+.product-slider {
+   display: flex;
+   overflow-x: auto;
+   gap: 12px;
+   scroll-behavior: smooth;
+   -webkit-overflow-scrolling: touch;
+}
+
+.product-slider::-webkit-scrollbar {
+   display: none;
+}
+

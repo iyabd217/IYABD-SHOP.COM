@@ -638,11 +638,13 @@ const PromoBanner = ({ title, desc, gradient, image }: { title: string, desc: st
   </div>
 );
 
-const CategorySection = ({ title, category, excludeId, sort }: { title: string, category: string, excludeId?: string, sort?: string }) => {
-  const [products, setProducts] = useState<any[]>([]);
+import { useQuery } from '@tanstack/react-query';
 
-  useEffect(() => {
-    productService.list({ category: category !== 'all' ? category : undefined, limit: 12 }).then(data => {
+const CategorySection = ({ title, category, excludeId, sort }: { title: string, category: string, excludeId?: string, sort?: string }) => {
+  const { data: products = [], isLoading } = useQuery({
+    queryKey: ['categoryProducts', category, excludeId, sort],
+    queryFn: async () => {
+      let data = await productService.list({ category: category !== 'all' ? category : undefined, limit: 12 });
       let finalData = data;
       if (!data || data.length === 0) {
         // Fallback to demo data
@@ -662,18 +664,32 @@ const CategorySection = ({ title, category, excludeId, sort }: { title: string, 
         finalData = [...finalData].sort(() => 0.5 - Math.random());
       }
       
-      setProducts(finalData.slice(0, 6)); // ensure 6 items max normally, maybe 10 for scroll? let's stick to 6 for standard section
-    });
-  }, [category, excludeId, sort]);
+      return finalData.slice(0, 6);
+    },
+    staleTime: 1000 * 60 * 5 // 5 minutes
+  });
+
+  if (isLoading) {
+    return (
+      <section className="mb-12 px-4">
+        <SectionHeader title={title} />
+        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
+          {[1,2,3,4].map((i) => (
+            <div key={i} className="flex-shrink-0 w-[170px] snap-start h-[260px] bg-slate-200 animate-pulse rounded-2xl"></div>
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   if (!products || products.length === 0) return null;
 
   return (
-    <section className="mb-12 px-4">
+    <section className="mb-12 px-4 relative">
       <SectionHeader title={title} />
-      <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
+      <div className="product-slider">
         {products?.map((p) => (
-          <div key={p.id} className="flex-shrink-0 w-[170px] snap-start">
+          <div key={p.id} className="min-w-[170px] w-[170px] flex-shrink-0 snap-start">
             <ProductCard product={p} />
           </div>
         ))}
@@ -4407,6 +4423,7 @@ const ProfilePage = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const { wishlist } = useWishlist();
   const [subPage, setSubPage] = useState<string | null>(null);
+  const navigate = useNavigate();
   
   // Simulation for Demo
   const coins = profile?.coins || 1250;
@@ -4605,12 +4622,12 @@ const ProfilePage = () => {
         {/* 4. Menu Items - Expanded */}
         <div className="px-4 mb-8">
           <div className="marketplace-card bg-white overflow-hidden divide-y divide-slate-50">
-             {menuItems.map((item, i) => (
+              {menuItems.map((item, i) => (
                <button 
                 key={i} 
                 onClick={() => {
-                  if(item.path === 'wishlist') window.location.href = '/wishlist';
-                  else if(item.path === 'support') window.location.href = '/support';
+                  if(item.path === 'wishlist') navigate('/wishlist');
+                  else if(item.path === 'support') navigate('/support');
                   else setSubPage(item.path);
                 }} 
                 className="w-full flex items-center gap-4 p-5 hover:bg-slate-50 transition-all group text-left active:bg-slate-100"
@@ -4892,22 +4909,37 @@ const AppRoutes = () => {
   );
 };
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      staleTime: 1000 * 60 * 5, // 5 minutes
+    },
+  },
+});
+
 export default function App() {
   return (
-    <HelmetProvider>
-        <AuthProvider>
-          <CartProvider>
-            <PopupManager />
-            <WishlistProvider>
-              <LayoutWrapper>
-                <Suspense fallback={null}>
-                   <AppRoutes />
-                </Suspense>
-              </LayoutWrapper>
-            </WishlistProvider>
-          </CartProvider>
-        </AuthProvider>
-    </HelmetProvider>
+    <QueryClientProvider client={queryClient}>
+      <HelmetProvider>
+          <AuthProvider>
+            <CartProvider>
+              <PopupManager />
+              <WishlistProvider>
+                <div className="app-wrapper">
+                  <LayoutWrapper>
+                    <Suspense fallback={null}>
+                       <AppRoutes />
+                    </Suspense>
+                  </LayoutWrapper>
+                </div>
+              </WishlistProvider>
+            </CartProvider>
+          </AuthProvider>
+      </HelmetProvider>
+    </QueryClientProvider>
   );
 }
 
