@@ -1366,9 +1366,8 @@ const AuthModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
       await loginWithEmail(loginForm.email, loginForm.password);
       onClose();
     } catch (err: any) {
-      console.error("Login Error:", err.code, err.message);
       if (err.message === 'Invalid login credentials' || err.code === 'invalid_credentials' || err.code === 'auth/wrong-password') {
-        setError('Invalid email or password. Please try again.');
+        setError('Incorrect email or password. If you recently registered, please verify your email first.');
       } else if (err.code === 'auth/operation-not-allowed') {
         setError('Login method disabled. Please enable "Email/Password" in Firebase Console.');
       } else if (err.code === 'auth/user-not-found') {
@@ -1376,6 +1375,7 @@ const AuthModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
       } else if (err.code === 'auth/invalid-email') {
         setError('Please enter a valid email address.');
       } else {
+        console.error("Login Error:", err.code, err.message);
         setError(err.message || 'Authentication failed. Check your connection or config.');
       }
     } finally {
@@ -1411,10 +1411,10 @@ const AuthModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
         area: regForm.area,
         street: regForm.street
       });
-      setSuccess('Account created successfully!');
+      setSuccess('Account created! Please check your email to verify before logging in.');
       setTimeout(() => {
-        onClose();
-      }, 1500);
+        setView('login');
+      }, 3000);
     } catch (err: any) {
       console.error("Registration Error:", err.code, err.message);
       if (err.message === 'User already registered' || err.code === 'user_already_exists' || err.code === 'auth/email-already-in-use') {
@@ -1823,7 +1823,7 @@ const Layout = ({ children, user }: { children: any, user: any }) => {
     localStorage.setItem('lang', lang);
   }, [lang]);
 
-  const isAdminRoute = location.pathname.startsWith('/admin');
+  const isAdminRoute = location.pathname.startsWith('/admin') && location.pathname !== '/admin-secure-login';
 
   if (isAdminRoute) {
     return <div className="min-h-screen bg-slate-100">{children}</div>;
@@ -1842,11 +1842,11 @@ const Layout = ({ children, user }: { children: any, user: any }) => {
                <Menu size={24} strokeWidth={2} />
             </button>
 
-            <Link to="/">
+            <Link to="/" className="header-logo-wrapper">
               <img
                  src={settings.logo}
                  alt="logo"
-                 className="site-logo"
+                 className="header-logo"
               />
             </Link>
         </div>
@@ -4835,6 +4835,7 @@ const LayoutWrapper = ({ children }: { children: any }) => {
 
 const AppRoutes = () => {
   const { isAdmin } = useAuth();
+  const navigate = useNavigate();
   
   return (
     <AnimatePresence mode="wait">
@@ -4850,7 +4851,14 @@ const AppRoutes = () => {
         <Route path="/profile" element={<Profile />} />
         <Route path="/wishlist" element={<Wishlist />} />
         <Route path="/support" element={<Support />} />
-        <Route path="/auth" element={<div className="auth-page py-20 text-center px-4 min-h-screen flex items-center justify-center relative z-10"><AuthModal isOpen={true} onClose={() => window.history.back()} /></div>} />
+        <Route path="/auth" element={
+          <div className="auth-page py-20 text-center px-4 min-h-screen flex flex-col items-center justify-center relative z-10 w-full">
+            <button onClick={() => navigate('/')} className="absolute top-6 left-6 flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-primary transition-colors">
+              ← Back Home
+            </button>
+            <AuthModal isOpen={true} onClose={() => navigate(-1)} />
+          </div>
+        } />
         <Route path="/blog" element={<Blog />} />
         <Route path="/categories" element={<Categories />} />
         <Route path="/track-order" element={<TrackOrder />} />

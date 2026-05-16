@@ -51,7 +51,7 @@ export const FlashSaleManagement = () => {
         try {
             const optimized = await optimizeImage(file);
             const formData = new FormData();
-            formData.append('image', optimized, 'flash_banner.webp');
+            formData.append('image', optimized, 'flash_banner.jpeg');
             
             const res = await fetch('/api/admin/flash-sale/upload', {
                 method: 'POST',
@@ -301,7 +301,7 @@ export const FlashSaleManagement = () => {
                                                     try {
                                                         const opt = await optimizeImage(file);
                                                         const fd = new FormData();
-                                                        fd.append('image', opt, 'flash.webp');
+                                                        fd.append('image', opt, 'flash.jpeg');
                                                         const res = await fetch('/api/admin/flash-sale/upload', { method: 'POST', body: fd });
                                                         const data = await res.json();
                                                         if (data.url) setEditingProduct({ ...editingProduct, product_image: data.url });

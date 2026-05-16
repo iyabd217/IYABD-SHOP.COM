@@ -116,14 +116,14 @@ export const optimizeImage = async (file: File): Promise<Blob> => {
                 canvas.height = height;
                 ctx?.drawImage(img, 0, 0, width, height);
                 
-                // Convert to WebP with 0.8 quality
+                // Convert to JPEG with 0.8 quality
                 canvas.toBlob((blob) => {
                     if (blob) {
                         resolve(blob);
                     } else {
                         reject(new Error('Canvas toBlob failed'));
                     }
-                }, 'image/webp', 0.8);
+                }, 'image/jpeg', 0.8);
             };
             img.onerror = (err) => reject(err);
         };
@@ -134,7 +134,7 @@ export const optimizeImage = async (file: File): Promise<Blob> => {
 export const storageService = {
     async uploadProductImage(productId: string, file: File | Blob, index?: number) {
         const timestamp = Date.now();
-        const extension = 'webp';
+        const extension = 'jpeg';
         const fileName = index !== undefined ? `image_${index}_${timestamp}.${extension}` : `main_${timestamp}.${extension}`;
         const filePath = `${productId}/${fileName}`;
         
@@ -164,7 +164,7 @@ export const storageService = {
 
     async uploadBannerImage(file: File | Blob) {
         const timestamp = Date.now();
-        const fileName = `banner_${timestamp}.webp`;
+        const fileName = `banner_${timestamp}.jpeg`;
         try {
             const { supabase } = await import('./supabaseClient');
             const { STORAGE_BUCKETS } = await import('./supabaseStorage');
@@ -177,7 +177,7 @@ export const storageService = {
 
     async uploadCategoryImage(file: File | Blob) {
         const timestamp = Date.now();
-        const fileName = `category_${timestamp}.webp`;
+        const fileName = `category_${timestamp}.jpeg`;
         try {
             const { supabase } = await import('./supabaseClient');
             const { STORAGE_BUCKETS } = await import('./supabaseStorage');
@@ -190,7 +190,7 @@ export const storageService = {
 
     async uploadBrandImage(file: File | Blob) {
         const timestamp = Date.now();
-        const fileName = `brand_${timestamp}.webp`;
+        const fileName = `brand_${timestamp}.jpeg`;
         try {
             const { supabase } = await import('./supabaseClient');
             const { STORAGE_BUCKETS } = await import('./supabaseStorage');

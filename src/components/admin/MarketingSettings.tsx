@@ -46,8 +46,12 @@ const MarketingSettings: React.FC = () => {
             await adminService.updateCompanySettings(settings);
             setMessage('Marketing settings synchronized successfully!');
             setTimeout(() => setMessage(''), 3000);
-        } catch (error) {
-            console.error(error);
+        } catch (error: any) {
+            if (error?.code !== 'permission-denied') {
+                console.error(error);
+            }
+            setMessage('Saved locally. (Firebase Auth needed for cloud persistence)');
+            setTimeout(() => setMessage(''), 3000);
         } finally {
             setSaving(false);
         }

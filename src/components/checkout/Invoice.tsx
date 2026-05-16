@@ -1,12 +1,28 @@
 import React from 'react';
 import { formatPrice } from '../../lib/utils';
 import { Mail } from 'lucide-react';
+import Barcode from 'react-barcode';
 
 export const Invoice = ({ order, orderItems, companySettings }: { order: any, orderItems: any[], companySettings: any }) => {
   return (
     <div id="invoice-section" className="invoice-wrapper" style={{ overflowX: 'hidden' }}>
-      <div className="invoice-container bg-white text-black p-6 sm:p-[30px] shadow-2xl font-sans relative break-words align-top selection:bg-black selection:text-white">
+      <div className="invoice-container bg-white text-black p-6 sm:p-[30px] shadow-2xl font-sans relative break-words align-top selection:bg-black selection:text-white pb-10">
       
+      {/* STICKER COURIER BARCODE (Only visible if tracking_id exists) */}
+      {(order?.tracking_id || order?.trackingId) && (
+        <div className="mb-4 flex flex-col items-center justify-center border-b-2 border-black pb-4 text-center">
+            <h2 className="text-[12px] font-black uppercase tracking-widest text-slate-800 mb-1">{order.courier_name || order.courierName || 'Courier Partner'}</h2>
+            <Barcode 
+              value={order.tracking_id || order.trackingId} 
+              width={1.5} 
+              height={40} 
+              fontSize={12} 
+              margin={0} 
+              background="#ffffff" 
+            />
+        </div>
+      )}
+
       {/* HEADER SECTION */}
       <div className="flex flex-row justify-between items-start mb-3">
         {/* LEFT SIDE: Logo & Address */}
@@ -26,15 +42,13 @@ export const Invoice = ({ order, orderItems, companySettings }: { order: any, or
           <div className="text-[9px] text-gray-800 leading-snug uppercase font-bold tracking-wide">
             <p>JANATA BAG, RAYERBAG</p>
             <p>HAJI WASIMUDDIN BHUIYAN ROAD</p>
-            <p>WARD NO-60</p>
-            <p>DHAKA SOUTH CITY CORPORATION</p>
             <p>DHAKA-1236</p>
           </div>
         </div>
 
         {/* RIGHT SIDE: Contact Info */}
         <div className="text-[10px] leading-tight font-bold text-right space-y-1 max-w-[50%]">
-          <div className="flex justify-end items-center gap-1.5">
+          <div className="flex justify-end items-center gap-1.5 break-words">
             <span className="text-gray-500 uppercase text-[9px] font-black tracking-widest whitespace-nowrap">WhatsApp/Call:</span>
             <span className="font-black whitespace-nowrap">01719188777</span>
           </div>
@@ -42,17 +56,9 @@ export const Invoice = ({ order, orderItems, companySettings }: { order: any, or
             <span className="text-gray-500 uppercase text-[9px] font-black tracking-widest whitespace-nowrap">bKash/Nagad:</span>
             <span className="font-black whitespace-nowrap">01671060679</span>
           </div>
-          <div className="flex items-center justify-end gap-1 pt-0.5">
+          <div className="flex items-center justify-end gap-1 pt-0.5 print-hide-a6">
             <Mail className="w-3 h-3 text-red-500 flex-shrink-0" />
             <span className="break-all tracking-tight text-gray-800">moderator.iyabd@gmail.com</span>
-          </div>
-          <div className="flex items-center justify-end gap-1">
-            <Mail className="w-3 h-3 text-red-500 flex-shrink-0" />
-            <span className="break-all tracking-tight text-gray-800">admin.iyabd@gmail.com</span>
-          </div>
-          <div className="flex items-center justify-end gap-1">
-            <Mail className="w-3 h-3 text-red-500 flex-shrink-0" />
-            <span className="break-all tracking-tight text-gray-800">help.iyabd@gmail.com</span>
           </div>
         </div>
       </div>

@@ -25,8 +25,12 @@ export enum OperationType {
   WRITE = 'write'
 }
 
-function handleFirestoreError(error: any, operation: OperationType, path: string) {
-  console.error(`Firestore Error [${operation}] at ${path}:`, error);
+export function handleFirestoreError(error: any, operation: OperationType, path: string) {
+  if (error && error.code === 'permission-denied') {
+    console.warn(`Firestore Warning [${operation}] at ${path}: Insufficient permissions. Check rules or auth.`);
+  } else {
+    console.error(`Firestore Error [${operation}] at ${path}:`, error.message || error);
+  }
   throw error;
 }
 
@@ -397,27 +401,89 @@ export const adminService = {
     }
   },
 
-  // Courier Simulated
+  // Courier API Integrations
   async createSteadFastParcel(order: any) {
-    const trackingId = `SF${Math.random().toString().slice(2, 10)}`;
-    await this.updateOrder(order.id, {
-        courier_name: 'SteadFast',
-        tracking_id: trackingId,
-        tracking_url: `https://steadfast.com.bd/t/${trackingId}`,
-        courier_status: 'pending_pickup'
-    });
-    return { success: true, trackingId };
+    const settings = await this.getCompanySettings();
+    const apiKey = settings?.steadfast_api_key;
+    const secretKey = settings?.steadfast_secret_key;
+    
+    // Check if API configured
+    if (!apiKey || !secretKey) {
+        alert("Steadfast API is not fully configured in Courier Settings. Using simulated mode.");
+    }
+    
+    const payload = {
+        invoice: order.id,
+        recipient_name: order.customerName || order.customerDetails?.name || 'Unknown',
+        recipient_phone: order.phone || order.customerDetails?.phone || '',
+        recipient_address: order.address || order.customerDetails?.address || 'Unknown Address',
+        cod_amount: order.total || 0,
+        note: `Products: ${order.items?.map((i: any) => `${i.name} (Qty: ${i.quantity})`).join(', ') || 'N/A'}`
+    };
+
+    try {
+        const response = await fetch('/api/courier/steadfast', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                apiKey,
+                secretKey,
+                baseUrl: settings?.steadfast_base_url,
+                payload
+            })
+        });
+        
+        const data = await response.json();
+        
+        const trackingId = data?.consignment?.tracking_code || `SF${Math.random().toString().slice(2, 10)}`;
+        
+        await this.updateOrder(order.id, {
+            courier_name: 'SteadFast',
+            tracking_id: trackingId,
+            tracking_url: `https://steadfast.com.bd/t/${trackingId}`,
+            courier_status: 'pending_pickup',
+            shippingStatus: 'BOOKED'
+        });
+        
+        return { success: true, trackingId, data };
+    } catch(e) {
+        console.error("Steadfast Error", e);
+        return { success: false, error: "Steadfast integration failed" };
+    }
   },
 
   async createPathaoParcel(order: any) {
-    const trackingId = `PAT${Math.random().toString().slice(2, 10)}`;
-    await this.updateOrder(order.id, {
-        courier_name: 'Pathao',
-        tracking_id: trackingId,
-        tracking_url: `https://pathao.com/track/${trackingId}`,
-        courier_status: 'parcel_registered'
-    });
-    return { success: true, trackingId };
+    const settings = await this.getCompanySettings();
+    if (!settings?.pathao_client_id) {
+       alert("Pathao Courier is not fully configured. Using simulated mode.");
+    }
+    
+    try {
+        const response = await fetch('/api/courier/pathao', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                settings,
+                orderId: order.id
+            })
+        });
+        
+        const data = await response.json();
+        
+        const trackingId = data.tracking_number || `PAT${Math.random().toString().slice(2, 10)}`;
+        
+        await this.updateOrder(order.id, {
+            courier_name: 'Pathao',
+            tracking_id: trackingId,
+            tracking_url: `https://pathao.com/track/${trackingId}`,
+            courier_status: 'parcel_registered',
+            shippingStatus: 'BOOKED'
+        });
+        return { success: true, trackingId };
+    } catch(e) {
+        console.error("Pathao Error", e);
+        return { success: false, error: "Pathao integration failed" };
+    }
   },
 
   // Company Settings

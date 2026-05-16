@@ -184,10 +184,22 @@ export const AuthProvider = ({ children }: { children: any }) => {
       });
       const data = await res.json();
       if (data.success) {
-        const tRes = await fetch('/api/admin/firebase-token');
-        if (tRes.ok) {
-           const tData = await tRes.json();
-           if (tData.token) await signInWithCustomToken(auth, tData.token);
+        // Authenticate in Firebase explicitly
+        const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
+        try {
+          await signInWithEmailAndPassword(auth, email, password);
+        } catch (e: any) {
+          if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
+             try {
+                await createUserWithEmailAndPassword(auth, email, password);
+             } catch(createErr) {
+                console.error("Firebase Auth create error:", createErr);
+             }
+          } else if (e.code === 'auth/operation-not-allowed') {
+             console.warn("Firebase email/password auth is not enabled. Admin functions will operate in degraded mode.");
+          } else {
+             console.error("Firebase Auth sign in error:", e.message || e);
+          }
         }
         setIsAdmin(true);
         return true;

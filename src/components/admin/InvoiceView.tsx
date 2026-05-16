@@ -1,21 +1,27 @@
 import React from 'react';
+import { useSettings } from '../../context/SettingsContext';
 
 interface InvoiceProps {
     order: any;
 }
 
 const InvoiceView: React.FC<InvoiceProps> = ({ order }) => {
+    const { settings } = useSettings();
     return (
         <div className="invoice max-w-[1000px] mx-auto bg-white p-10 border border-slate-200">
-            <div className="header flex justify-between border-b-2 border-slate-900 pb-5 mb-5">
+            <div className="header flex justify-between items-start border-b-2 border-slate-900 pb-5 mb-5">
                 <div>
-                    <div className="logo text-4xl font-bold">IYABD</div>
-                    <p>RAYARBAG, DHAKA, BANGLADESH</p>
+                    {settings.logo ? (
+                        <img src={settings.logo} alt="Logo" className="h-10 w-auto object-contain mb-2" />
+                    ) : (
+                        <div className="logo text-4xl font-bold">IYABD</div>
+                    )}
+                    <p className="whitespace-pre-line text-sm">{settings.address || 'RAYARBAG, DHAKA, BANGLADESH'}</p>
                 </div>
-                <div className="text-right">
-                    <p>WHATSAPP: 01719188777</p>
-                    <p>BKASH/NAGAD: 01671060679</p>
-                    <p>admin.iyabd@gmail.com</p>
+                <div className="text-right text-sm">
+                    <p>WHATSAPP: {settings.whatsapp || '01719188777'}</p>
+                    <p>PAYMENT: {settings.bkash || '01671060679'}</p>
+                    <p>{settings.email || 'contact@iyabd.com'}</p>
                 </div>
             </div>
             

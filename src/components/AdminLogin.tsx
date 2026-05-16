@@ -28,8 +28,8 @@ const AdminLogin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 selection:bg-primary selection:text-white pb-[90px]">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <div className="w-full min-h-[80vh] bg-slate-950 rounded-[40px] flex items-center justify-center p-4 sm:p-10 selection:bg-primary selection:text-white relative overflow-hidden pb-[90px]">
+      <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/20 blur-[120px] rounded-full" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full" />
       </div>

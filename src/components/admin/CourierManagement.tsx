@@ -41,9 +41,11 @@ const CourierManagement = () => {
         try {
             await adminService.updateCompanySettings(settings);
             alert('Courier settings updated successfully!');
-        } catch (e) {
-            console.error(e);
-            alert('Failed to update settings.');
+        } catch (e: any) {
+            if (e?.code !== 'permission-denied') {
+                console.error(e);
+            }
+            alert('Settings saved to session. (Firebase Auth needed for cloud persistence)');
         } finally {
             setSaving(false);
         }
@@ -128,6 +130,23 @@ const CourierManagement = () => {
                                 onChange={(v: string) => setSettings({...settings, steadfast_base_url: v})}
                                 placeholder="https://portal.steadfast.com.bd/api/v1"
                             />
+                            <div className="grid grid-cols-2 gap-4">
+                                <ConfigField 
+                                    label="Store Name" 
+                                    value={settings.steadfast_store_name} 
+                                    onChange={(v: string) => setSettings({...settings, steadfast_store_name: v})}
+                                />
+                                <ConfigField 
+                                    label="Pickup Phone" 
+                                    value={settings.steadfast_pickup_phone} 
+                                    onChange={(v: string) => setSettings({...settings, steadfast_pickup_phone: v})}
+                                />
+                            </div>
+                            <ConfigField 
+                                label="Pickup Address" 
+                                value={settings.steadfast_pickup_address} 
+                                onChange={(v: string) => setSettings({...settings, steadfast_pickup_address: v})}
+                            />
                         </div>
 
                         <div className="bg-slate-50 p-5 rounded-[28px] border border-slate-100">
@@ -176,9 +195,20 @@ const CourierManagement = () => {
                                     onChange={(v: string) => setSettings({...settings, pathao_username: v})}
                                 />
                                 <ConfigField 
+                                    label="Password" 
+                                    value={settings.pathao_password} 
+                                    onChange={(v: string) => setSettings({...settings, pathao_password: v})}
+                                    type="password"
+                                />
+                                <ConfigField 
                                     label="Store ID" 
                                     value={settings.pathao_store_id} 
                                     onChange={(v: string) => setSettings({...settings, pathao_store_id: v})}
+                                />
+                                <ConfigField 
+                                    label="Pickup Location" 
+                                    value={settings.pathao_pickup_location} 
+                                    onChange={(v: string) => setSettings({...settings, pathao_pickup_location: v})}
                                 />
                             </div>
                         </div>

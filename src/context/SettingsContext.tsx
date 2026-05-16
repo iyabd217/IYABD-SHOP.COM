@@ -86,12 +86,47 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
     useEffect(() => {
         const fetchSettings = async () => {
             try {
+                // Clear old broken caches
+                localStorage.removeItem("old_logo");
+                
+                // First try localStorage
+                const localLogo = localStorage.getItem('website_logo');
+                if (localLogo) {
+                    setSettings(prev => ({ ...prev, logo: localLogo + (!localLogo.startsWith('data:') ? `?t=${Date.now()}` : '') }));
+                }
+
                 const cmsHeader = await cmsService.getWebsiteConfig('header.json');
                 const cmsFooter = await cmsService.getWebsiteConfig('footer.json');
                 const cmsSocial = await cmsService.getSocialLinks();
                 const cmsTheme = await cmsService.getWebsiteConfig('theme.json');
                 
-                const logoUrl = cmsService.getAssetUrl('website-assets', 'logos/logo.png');
+                let logoUrl = cmsService.getAssetUrl('website-assets', 'logos/logo.png');
+                if (logoUrl) logoUrl += `?t=${Date.now()}`;
+
+                // Also try from our Firestore settings if admin saved
+                let dbLogo = null;
+                try {
+                    // Try fetch from backend settings JSON
+                    const res = await fetch('/api/settings/logo').catch(()=>null);
+                    if (res && res.ok) {
+                        const data = await res.json();
+                        if (data.url && data.url !== '/default-logo.webp') {
+                            dbLogo = data.url;
+                        }
+                    }
+                    
+                    if (!dbLogo) {
+                        const { adminService } = await import('../lib/adminServices');
+                        const compSettings = await adminService.getCompanySettings();
+                        if (compSettings?.logo || compSettings?.website_logo) {
+                            dbLogo = compSettings.website_logo || compSettings.logo;
+                        }
+                    }
+                    
+                    if (dbLogo && !dbLogo.startsWith('data:')) {
+                        dbLogo += `?t=${Date.now()}`;
+                    }
+                } catch(e) {}
 
                 setSettings(prev => ({
                     ...prev,
@@ -99,7 +134,7 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
                     ...cmsFooter,
                     ...cmsSocial,
                     ...cmsTheme,
-                    logo: logoUrl || prev.logo,
+                    logo: dbLogo || localLogo || logoUrl || '/default-logo.webp',
                     facebook: cmsSocial?.facebook || prev.facebook,
                     tiktok: cmsSocial?.tiktok || prev.tiktok,
                     youtube: cmsSocial?.youtube || prev.youtube,

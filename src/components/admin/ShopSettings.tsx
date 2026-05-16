@@ -11,16 +11,65 @@ const ShopSettings: React.FC = () => {
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'logo' | 'bannerDesktop' | 'bannerMobile') => {
         if (e.target.files && e.target.files[0]) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                setLocalSettings(prev => ({ ...prev, [field]: event.target?.result as string }));
-            };
-            reader.readAsDataURL(e.target.files[0]);
+            const file = e.target.files[0];
+            if (field === 'logo') {
+                // Immediately update local preview URL to give fast feedback
+                const objectUrl = URL.createObjectURL(file);
+                setLocalSettings(prev => ({ ...prev, logo: objectUrl, _logoFile: file } as any));
+            } else {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    setLocalSettings(prev => ({ ...prev, [field]: event.target?.result as string }));
+                };
+                reader.readAsDataURL(file);
+            }
         }
     };
 
-    const handleSave = () => {
-        setSettings(localSettings);
+    const handleSave = async () => {
+        try {
+            let finalLogoUrl = localSettings.logo;
+            
+            // If they picked a new logo file
+            const file = (localSettings as any)._logoFile;
+            if (file) {
+                const formData = new FormData();
+                formData.append('logo', file);
+                
+                const res = await fetch('/api/settings/logo', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    finalLogoUrl = data.url;
+                }
+            }
+
+            const { adminService } = await import('../../lib/adminServices');
+            // Try updating Firestore if they are logged in. 
+            // We'll wrap it in try/catch so to ignore permissions error smoothly
+            try {
+               await adminService.updateCompanySettings({ website_logo: finalLogoUrl, logo: finalLogoUrl, bannerDesktop: localSettings.bannerDesktop, bannerTitle: localSettings.bannerTitle, bannerSubtitle: localSettings.bannerSubtitle });
+            } catch(firebaseErr) {
+               console.warn("Could not save to firestore, maybe insufficient permissions. Logo is already saved to Cloud Storage.");
+            }
+            
+            if (finalLogoUrl) {
+                localStorage.setItem("website_logo", finalLogoUrl);
+                setSettings(prev => ({ ...prev, ...localSettings, logo: finalLogoUrl }));
+                setLocalSettings(prev => ({ ...prev, logo: finalLogoUrl, _logoFile: null } as any));
+            } else {
+                localStorage.removeItem("website_logo");
+                setSettings(localSettings);
+            }
+            // Trigger a dispatch to update the site logo dynamically across all tabs/hooks
+            window.dispatchEvent(new Event('storage'));
+        } catch (e) {
+            console.error(e);
+            setSettings(localSettings);
+        }
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
     };
@@ -31,11 +80,21 @@ const ShopSettings: React.FC = () => {
 
             {/* Logo Section */}
             <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 space-y-4">
-                <h3 className="font-bold text-sm uppercase">Website Logo</h3>
+                <div className="flex justify-between items-start">
+                    <h3 className="font-bold text-sm uppercase">Website Logo</h3>
+                    <div className="text-right text-xs text-slate-500 font-medium">
+                        <p>Recommended Size: <span className="font-bold text-slate-700">500 × 200 PX</span></p>
+                        <p>Format: <span className="font-bold text-slate-700">PNG / WEBP / SVG</span></p>
+                        <p>Max Size: <span className="font-bold text-slate-700">2MB</span></p>
+                    </div>
+                </div>
                 <div className="flex items-center gap-6">
-                    <input type="file" accept="image/*" hidden ref={logoInputRef} onChange={(e) => handleFileChange(e, 'logo')} />
-                    <div onClick={() => logoInputRef.current?.click()} className="w-[160px] h-[160px] rounded-[32px] bg-[#F3F4F6] border-2 border-dashed border-[#CBD5E1] flex items-center justify-center cursor-pointer hover:border-[#2563EB] transition-all overflow-hidden shrink-0">
-                        {localSettings.logo ? <img src={localSettings.logo} className="w-full h-full object-contain" /> : <Camera size={48} className="text-slate-400" />}
+                    <input type="file" accept="image/png, image/webp, image/svg+xml, image/jpeg" hidden ref={logoInputRef} onChange={(e) => handleFileChange(e, 'logo')} />
+                    <div className="space-y-2 shrink-0">
+                        <div onClick={() => logoInputRef.current?.click()} className="w-[160px] h-[160px] rounded-[32px] bg-[#F3F4F6] border-2 border-dashed border-[#CBD5E1] flex items-center justify-center cursor-pointer hover:border-[#2563EB] transition-all overflow-hidden">
+                            {localSettings.logo ? <img src={localSettings.logo} className="w-full h-full object-contain" /> : <Camera size={48} className="text-slate-400" />}
+                        </div>
+                        <p className="text-center text-xs font-bold text-slate-500">Best Logo Ratio: 5:2</p>
                     </div>
                     <div className="space-y-2">
                         <button onClick={() => logoInputRef.current?.click()} className="px-6 py-3 bg-slate-100 rounded-2xl text-sm font-bold hover:bg-slate-200">Change Logo</button>

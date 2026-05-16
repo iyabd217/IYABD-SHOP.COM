@@ -4,6 +4,8 @@ import { Send, AlertCircle, Mail, Megaphone, FileText, List as ListIcon, Trash2,
 import { db } from '../../lib/firebase';
 import { collection, query, orderBy, getDocs, addDoc } from 'firebase/firestore';
 
+import { handleFirestoreError, OperationType } from '../../lib/adminServices';
+
 export default function CustomerMessagesManager({ activeTab }: { activeTab: string }) {
     const [messages, setMessages] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -17,6 +19,7 @@ export default function CustomerMessagesManager({ activeTab }: { activeTab: stri
                 setMessages(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             } catch (err) {
                 console.error("Failed to load messages", err);
+                handleFirestoreError(err, OperationType.LIST, 'customer-emails');
             }
             setLoading(false);
         };

@@ -197,16 +197,45 @@ body {
 }
 
 @media print {
+    body.print-a4 * , 
+    body.print-a6 * , 
+    body.print-sticker * {
+        visibility: hidden;
+    }
+
+    body.print-a4 .print-container, 
+    body.print-a4 .print-container *,
+    body.print-a6 .print-container, 
+    body.print-a6 .print-container *,
+    body.print-sticker .print-container, 
+    body.print-sticker .print-container * {
+        visibility: visible;
+    }
+
+    .print-container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+    }
+
     body {
        margin: 0;
        padding: 0;
        background: #fff;
+       overflow-x: hidden;
+       height: auto !important;
     }
     
     .invoice-wrapper {
         width: 100%;
         display: flex;
         justify-content: center;
+        page-break-after: always;
+        break-after: page;
+        break-inside: avoid;
         align-items: center;
         padding: 0;
     }
@@ -245,6 +274,126 @@ body {
         padding: 0 !important;
         box-shadow: none !important;
     }
+    
+    body.print-sticker {
+        margin: 0;
+        background: white;
+    }
+    body.print-sticker @page {
+        size: 100mm 150mm;
+        margin: 0;
+    }
+    body.print-sticker .print-hide-a6 {
+        display: none !important;
+    }
+    body.print-sticker .invoice-wrapper {
+        align-items: flex-start;
+        padding: 5mm;
+    }
+    body.print-sticker .invoice-container {
+        max-width: 90mm !important;
+        padding: 0 !important;
+    }
+}
+
+/* Perfect Mobile Responsive Order Edit Panel */
+.order-edit-wrapper {
+   width: 100%;
+   max-width: 100%;
+   overflow-x: hidden;
+}
+
+.order-action-bar {
+   position: sticky;
+   top: 0;
+   z-index: 9999;
+   background: #f7f7fb;
+   padding: 12px;
+   display: flex;
+   gap: 10px;
+   overflow-x: auto;
+   overflow-y: hidden;
+   white-space: nowrap;
+   border-bottom: 1px solid #ececec;
+}
+
+.order-content-area {
+   margin-top: 10px;
+   padding: 16px;
+   padding-bottom: 140px;
+}
+
+.action-btn {
+   min-width: 110px;
+   height: 44px;
+   border-radius: 16px;
+   background: #fff;
+   border: 1px solid #e5e7eb;
+   font-size: 14px;
+   font-weight: 700;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   gap: 6px;
+   flex-shrink: 0;
+   pointer-events: auto !important;
+   position: relative;
+   z-index: 999;
+}
+
+.action-btn span {
+   color: #111 !important;
+   opacity: 1 !important;
+   visibility: visible !important;
+}
+
+.edit-modal {
+   overflow-y: auto;
+   padding-bottom: 200px;
+}
+
+.order-card {
+   background: #fff;
+   border-radius: 22px;
+   padding: 18px;
+   margin-bottom: 18px;
+   box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+}
+
+.order-input {
+   width: 100%;
+   height: 54px;
+   border-radius: 16px;
+   border: 1px solid #e5e7eb;
+   padding: 0 16px;
+   font-size: 16px;
+   background: #f9fafb;
+}
+
+.order-textarea {
+   min-height: 110px;
+   border-radius: 16px;
+   padding: 16px;
+   width: 100%;
+   border: 1px solid #e5e7eb;
+   font-size: 16px;
+   background: #f9fafb;
+}
+
+.two-column-grid {
+   display: grid;
+   grid-template-columns: 1fr 1fr;
+   gap: 12px;
+}
+
+@media(max-width: 640px) {
+   .two-column-grid {
+      grid-template-columns: 1fr;
+   }
+}
+
+.status-card {
+   margin-top: 20px;
 }
 
 .custom-header {
@@ -414,7 +563,7 @@ body {
    margin-top: 28px;
 }
 
-.action-btn {
+.dashboard-action-btn {
    background: #fff;
    border-radius: 24px;
    padding: 18px 10px;
@@ -480,11 +629,52 @@ body {
    margin-right: -6px;
 }
 
-.site-logo {
-   width: 88px;
+img {
+   image-rendering: auto;
+}
+
+.header-logo-wrapper {
+   width: 180px;
    height: 42px;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   overflow: hidden;
+}
+
+@media (max-width: 1024px) {
+   .header-logo-wrapper {
+       width: 140px;
+   }
+}
+
+@media (max-width: 768px) {
+   .header-logo-wrapper {
+       width: 110px;
+       height: auto;
+   }
+}
+
+.header-logo {
+   max-width: 180px;
+   max-height: 100%;
    object-fit: contain;
-   margin-left: -14px;
+   display: block;
+   width: auto;
+   height: 36px;
+   min-width: 80px;
+}
+
+@media (max-width: 1024px) {
+   .header-logo {
+       max-width: 140px;
+   }
+}
+
+@media (max-width: 768px) {
+   .header-logo {
+       max-width: 110px;
+   }
 }
 
 .header-search {
@@ -630,5 +820,9 @@ section {
 
 .product-slider::-webkit-scrollbar {
    display: none;
+}
+
+body {
+   overflow-x: hidden;
 }
 
