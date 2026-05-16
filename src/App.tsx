@@ -297,70 +297,38 @@ const BottomNav = () => {
   const { user } = useAuth();
   const { settings } = useSettings();
   const location = useLocation();
+  const navigate = useNavigate();
 
-  if (location.pathname.startsWith('/product/') || location.pathname.startsWith('/admin')) {
+  if (location.pathname.startsWith('/product/') || location.pathname === '/admin' || location.pathname.startsWith('/admin/')) {
     return null;
   }
 
-  const navItems: { label: string; icon: any; path?: string; isSupport?: boolean; isAction?: boolean; action?: () => void }[] = [
-    { label: 'Home', icon: HomeIcon, path: '/' },
-    { label: 'Category', icon: LayoutGrid, path: '/categories' },
-    { label: 'Deals', icon: DealsIcon, path: '/flash-sale' },
-    { label: 'Support', icon: Headset, path: '/support', isSupport: true },
-    { label: 'Account', icon: User, path: user ? '/profile' : '/auth' },
-  ];
-
   return (
-    <div className="fixed bottom-0 left-0 w-full z-[999] bg-[rgba(255,255,255,0.96)] backdrop-blur-[18px] border-t border-[#eee] flex items-center justify-around h-[72px] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
-      {navItems.map((item) => {
-        const isActive = !item.isAction && (location.pathname === item.path || (item.path === '/categories' && location.pathname === '/shop' && location.search.includes('category')));
-        
-        return (
-          <div key={item.label} className="relative flex-1 max-w-[100px]">
-            {item.isAction ? (
-              <button 
-                onClick={item.action}
-                className="flex flex-col items-center justify-center w-full h-full text-slate-500 hover:text-primary transition-all active:scale-95"
-              >
-                <item.icon size={22} className="text-[#00B2FF]" />
-                <span className="text-[10px] font-bold tracking-tight mt-1">{item.label}</span>
-              </button>
-            ) : (
-              <Link 
-                to={item.path!} 
-                className={`flex flex-col items-center justify-center w-full h-full transition-all duration-300 ${isActive ? (item.isSupport ? 'text-purple-600' : 'text-primary') : 'text-slate-400'}`}
-              >
-                <div className="relative">
-                  <item.icon 
-                    size={isActive ? 24 : 22} 
-                    className={`transition-all duration-300 ${isActive ? 'scale-110' : ''}`} 
-                    strokeWidth={isActive ? 2.5 : 2} 
-                  />
-                  {isActive && item.isSupport && (
-                    <motion.div 
-                      layoutId="nav-active-glow-support"
-                      className="absolute -inset-2 bg-gradient-to-r from-purple-600 to-indigo-600 opacity-20 blur-md rounded-full -z-10 animate-pulse"
-                    />
-                  )}
-                  {isActive && !item.isSupport && (
-                    <motion.div 
-                      layoutId="nav-active-glow"
-                      className="absolute -inset-2 bg-primary/20 blur-md rounded-full -z-10"
-                    />
-                  )}
-                  {/* Notification Dot for Support */}
-                  {item.isSupport && !isActive && (
-                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
-                  )}
-                </div>
-                <span className={`text-[10px] font-bold tracking-tight mt-1 transition-all ${isActive ? (item.isSupport ? 'text-purple-600 drop-shadow-[0_0_5px_rgba(147,51,234,0.5)]' : 'text-primary') : 'text-slate-400'}`}>
-                  {item.label}
-                </span>
-              </Link>
-            )}
-          </div>
-        );
-      })}
+    <div className="mobile-bottom-nav">
+      <button onClick={() => navigate('/')} className={location.pathname === '/' ? 'active' : ''}>
+        <HomeIcon size={24} className="mb-1" />
+        <span>Home</span>
+      </button>
+
+      <button onClick={() => navigate('/categories')} className={location.pathname.startsWith('/categories') ? 'active' : ''}>
+        <LayoutGrid size={24} className="mb-1" />
+        <span>Category</span>
+      </button>
+
+      <button onClick={() => navigate('/flash-sale')} className={location.pathname.startsWith('/flash-sale') ? 'active' : ''}>
+        <DealsIcon size={24} className="mb-1" />
+        <span>Deals</span>
+      </button>
+
+      <button onClick={() => navigate('/support')} className={location.pathname.startsWith('/support') ? 'active' : ''}>
+        <Headset size={24} className="mb-1" />
+        <span>Support</span>
+      </button>
+
+      <button onClick={() => navigate(user ? '/profile' : '/auth')} className={location.pathname.startsWith('/profile') || location.pathname.startsWith('/auth') ? 'active' : ''}>
+        <User size={24} className="mb-1" />
+        <span>Account</span>
+      </button>
     </div>
   );
 };
@@ -1476,21 +1444,14 @@ const AuthModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 sm:p-4">
+        <div className="w-full relative z-10 flex flex-col items-center justify-center p-0">
           <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="absolute inset-0 bg-black/60 backdrop-blur-md"
-          />
-          <motion.div 
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            className="bg-white w-full max-w-lg rounded-t-[40px] sm:rounded-[40px] overflow-hidden relative z-10 shadow-2xl h-full sm:h-auto max-h-[95vh] flex flex-col"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 20, opacity: 0 }}
+            className="bg-white w-full max-w-lg rounded-[40px] overflow-hidden relative z-10 shadow-2xl flex flex-col"
           >
-            <div className="p-8 sm:p-10 flex flex-col h-full">
+            <div className="p-8 sm:p-10 flex flex-col">
                <div className="flex justify-between items-center mb-8">
                   <div className="text-left">
                     <h2 className="text-2xl font-black text-slate-900 tracking-tight">
@@ -4889,7 +4850,7 @@ const AppRoutes = () => {
         <Route path="/profile" element={<Profile />} />
         <Route path="/wishlist" element={<Wishlist />} />
         <Route path="/support" element={<Support />} />
-        <Route path="/auth" element={<div className="py-20 text-center px-4 min-h-screen flex items-center justify-center"><AuthModal isOpen={true} onClose={() => window.history.back()} /></div>} />
+        <Route path="/auth" element={<div className="auth-page py-20 text-center px-4 min-h-screen flex items-center justify-center relative z-10"><AuthModal isOpen={true} onClose={() => window.history.back()} /></div>} />
         <Route path="/blog" element={<Blog />} />
         <Route path="/categories" element={<Categories />} />
         <Route path="/track-order" element={<TrackOrder />} />

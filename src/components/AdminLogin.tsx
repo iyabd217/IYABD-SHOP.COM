@@ -28,7 +28,7 @@ const AdminLogin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 selection:bg-primary selection:text-white">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 selection:bg-primary selection:text-white pb-[90px]">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/20 blur-[120px] rounded-full" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full" />
@@ -39,6 +39,9 @@ const AdminLogin = () => {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md relative z-10"
       >
+        <button onClick={() => navigate('/')} className="mb-8 inline-flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-white transition-colors">
+          ← Back Home
+        </button>
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-3xl mb-6 border border-primary/20 backdrop-blur-xl">
              <ShieldCheck className="text-primary" size={32} />
