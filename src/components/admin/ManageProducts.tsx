@@ -5,6 +5,7 @@ import {
   Copy, QrCode, Share2, ToggleRight, Archive, EyeOff, Layers, TrendingUp, Zap, TrendingDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'react-hot-toast';
 import { productService, storageService, optimizeImage, brandService, categoryService } from '../../lib/services';
 import { useSettings } from '../../context/SettingsContext';
 
@@ -59,6 +60,7 @@ const ManageProducts: React.FC = () => {
         metaDescription: '', 
         keywords: '',
         description: '',
+        video_url: '',
         fabric_type: '',
         gsm: '',
         fit_type: '',
@@ -178,6 +180,7 @@ const ManageProducts: React.FC = () => {
                     metaDescription: prod.metaDescription || '',
                     keywords: prod.keywords || '',
                     description: prod.description || '',
+                    video_url: prod.video_url || '',
                     fabric_type: prod.fabric_type || '',
                     gsm: prod.gsm || '',
                     fit_type: prod.fit_type || '',
@@ -276,11 +279,17 @@ const ManageProducts: React.FC = () => {
         if (!productToDelete) return;
         setLoading(true);
         try {
-            await productService.delete(productToDelete.id);
-            // Optionally delete images from storage here if needed
+            await toast.promise(
+                productService.delete(productToDelete.id),
+                {
+                    loading: 'Deleting product...',
+                    success: 'Product deleted successfully',
+                    error: 'Error deleting product'
+                }
+            );
             fetchProducts();
         } catch (error) {
-            alert('Error deleting product');
+            console.error('Delete error:', error);
         } finally {
             setProductToDelete(null);
             setLoading(false);
@@ -314,15 +323,17 @@ const ManageProducts: React.FC = () => {
     const removeColor = (c: string) => setColors(colors.filter(item => item !== c));
 
     const handleSave = async () => {
+        console.log("SAVE BUTTON CLICKED - Product Creation/Update started");
         // Validation
         if (!formData.name || !formData.regularPrice || !formData.category) {
-            alert('Please fill in required fields (Name, Price, Category)');
+            console.warn("Validation failed:", { name: !!formData.name, price: !!formData.regularPrice, category: !!formData.category });
+            toast.error('Please fill in required fields (Name, Price, Category)');
             return;
         }
 
         setSaving(true);
-
-        try {
+        const savePromise = async () => {
+            console.log("Starting savePromise...");
             const finalSlug = formData.slug || formData.name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
             const finalSku = formData.sku || `SKU-${Math.floor(Math.random() * 1000000)}`;
 
@@ -378,6 +389,7 @@ const ManageProducts: React.FC = () => {
                 metaDescription: formData.metaDescription,
                 keywords: formData.keywords,
                 description: formData.description,
+                video_url: formData.video_url,
                 fabric_type: formData.fabric_type,
                 gsm: formData.gsm,
                 fit_type: formData.fit_type,
@@ -387,21 +399,32 @@ const ManageProducts: React.FC = () => {
                 country: formData.country,
                 stitch_quality: formData.stitch_quality,
                 rating: editingProduct?.rating || 5.0,
-                sold: editingProduct?.sold || 0
+                sold: editingProduct?.sold || 0,
+                updatedAt: new Date().toISOString()
             };
 
-            // Auto-save brand if new
-            if (formData.brand && !brands.some(b => b.name === formData.brand)) {
-                await brandService.create(formData.brand);
+            console.log("[DEBUG] Final Product Data to Save:", JSON.stringify(productData, null, 2));
+
+            try {
+                // Auto-save brand if new
+                if (formData.brand && !brands.some(b => b.name === formData.brand)) {
+                    console.log("Saving new brand:", formData.brand);
+                    await brandService.create(formData.brand);
+                }
+
+                if (editingProduct) {
+                    console.log("Updating existing product:", editingProduct.id);
+                    await productService.update(editingProduct.id, productData);
+                } else {
+                    console.log("Creating new product...");
+                    await productService.create(productData);
+                }
+                console.log("Product save operation completed successfully");
+            } catch (err: any) {
+                console.error("Critical error during product save service call:", err);
+                throw err;
             }
 
-            if (editingProduct) {
-                await productService.update(editingProduct.id, productData);
-            } else {
-                await productService.create(productData);
-            }
-
-            alert('Product Saved Successfully!');
             setShowAddForm(false);
             setEditingProduct(null);
             fetchProducts();
@@ -412,7 +435,7 @@ const ManageProducts: React.FC = () => {
                 regularPrice: '', discountPrice: '', tax: '', stockQuantity: '', lowStockAlert: '',
                 active: true, featured: false, bestSeller: false, newArrival: false,
                 weight: '', dimensions: '', shippingClass: 'Standard',
-                metaTitle: '', metaDescription: '', keywords: '', description: '',
+                metaTitle: '', metaDescription: '', keywords: '', description: '', video_url: '',
                 fabric_type: '', gsm: '', fit_type: '', wash_instruction: '', material: '', stretch_type: '', country: '', stitch_quality: ''
             });
             setMainImage(null);
@@ -421,12 +444,15 @@ const ManageProducts: React.FC = () => {
             setGalleryImageFiles([]);
             setSizes([]);
             setColors([]);
-        } catch (error) {
-            console.error("Save Error:", error);
-            alert('Failed to save product. Please check console for details.');
-        } finally {
+        };
+
+        toast.promise(savePromise(), {
+            loading: 'Saving product...',
+            success: 'Product saved successfully!',
+            error: (err) => `Save failed: ${err.message || 'Unknown error'}`
+        }).finally(() => {
             setSaving(false);
-        }
+        });
     };
 
     if (showAddForm) {
@@ -961,12 +987,20 @@ const ManageProducts: React.FC = () => {
                     <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-100 space-y-5">
                         <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">Product Media</h3>
                          <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">Video Upload (Optional)</label>
-                            <div className="w-full h-32 border-2 border-dashed border-slate-200 rounded-[16px] bg-slate-50 flex flex-col items-center justify-center cursor-pointer hover:border-[#6D28D9] transition-colors">
-                                <Video size={24} className="text-slate-400 mb-2" />
-                                <p className="text-sm font-semibold text-[#6D28D9]">Upload Video</p>
-                                <p className="text-xs text-slate-500 mt-1">MP4, max 10MB</p>
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">Video URL (YouTube/Direct Link)</label>
+                            <div className="flex gap-2">
+                                <div className="flex-1 relative">
+                                    <Video className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                    <input 
+                                        type="text" 
+                                        value={formData.video_url}
+                                        onChange={(e) => setFormData({...formData, video_url: e.target.value})}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-[12px] pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-[#6D28D9]" 
+                                        placeholder="https://youtube.com/watch?v=..." 
+                                    />
+                                </div>
                             </div>
+                            <p className="text-[10px] text-slate-400 mt-1">Provide a link to a product video (optional)</p>
                         </div>
                     </div>
 

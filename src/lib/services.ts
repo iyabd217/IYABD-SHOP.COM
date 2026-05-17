@@ -22,6 +22,7 @@ import {
 } from 'firebase/storage';
 import { db, auth, storage } from './firebase';
 import { cmsService } from './cmsService';
+import { adminFetch } from './utils';
 
 export enum OperationType {
   CREATE = 'create',
@@ -133,31 +134,39 @@ export const optimizeImage = async (file: File): Promise<Blob> => {
 
 export const storageService = {
     async uploadProductImage(productId: string, file: File | Blob, index?: number) {
-        const timestamp = Date.now();
-        const extension = 'jpeg';
-        const fileName = index !== undefined ? `image_${index}_${timestamp}.${extension}` : `main_${timestamp}.${extension}`;
-        const filePath = `${productId}/${fileName}`;
+        const formData = new FormData();
+        formData.append('image', file);
+        formData.append('productId', productId);
         
         try {
-            const { supabase } = await import('./supabaseClient');
-            const { STORAGE_BUCKETS } = await import('./supabaseStorage');
-            
-            const { data, error } = await supabase.storage
-              .from(STORAGE_BUCKETS.products)
-              .upload(filePath, file, { upsert: true });
-              
-            if (error) throw error;
-            
-            const { data: publicData } = supabase.storage
-              .from(STORAGE_BUCKETS.products)
-              .getPublicUrl(filePath);
+            const response = await adminFetch('/api/upload/product', {
+                method: 'POST',
+                body: formData
+            });
 
-            return {
-                url: publicData.publicUrl,
-                path: filePath
-            };
-        } catch (error) {
-            console.error("Storage Upload Error:", error);
+            const contentType = response.headers.get('content-type');
+            
+            if (response.ok && contentType && contentType.includes('application/json')) {
+                const data = await response.json();
+                if (data.success) {
+                    return {
+                        url: data.url,
+                        path: data.path
+                    };
+                }
+                throw new Error(data.message || 'Server reported upload failure');
+            } else {
+                const text = await response.text();
+                console.error(`Upload failed [${response.status}]:`, text.slice(0, 500));
+                
+                if (text.startsWith('<!doctype') || text.startsWith('<html')) {
+                    throw new Error(`Server returned HTML instead of JSON. This usually means a 404 or 500 error occurred. Status: ${response.status}`);
+                }
+                
+                throw new Error(text || 'Unknown upload error');
+            }
+        } catch (error: any) {
+            console.error("Product upload service error:", error);
             throw error;
         }
     },
@@ -316,67 +325,159 @@ export const productService = {
   async create(productData: any) {
     const path = 'products';
     try {
-      // Sync with Firebase
+      // 1. Sync with Firebase first (for real-time frontend support)
+      console.log("[Service] Syncing with Firebase...");
       const docRef = await addDoc(collection(db, path), {
         ...productData,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
       
-      // Sync with Supabase table
-      try {
-        const { supabase } = await import('./supabaseClient');
-        await supabase.from('products').insert([{
-          ...productData,
-          id: docRef.id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }]);
-      } catch (e) {
-        console.warn("Supabase Sync Failed:", e);
+      const firebaseId = docRef.id;
+      console.log("[Service] Firebase sync successful, id:", firebaseId);
+
+      // 2. Prepare data for Supabase (matching supabase_schema.sql exactly)
+      const supabaseData = this.mapProductDataForSupabase(firebaseId, productData);
+
+      console.log("[Service] Sending to Supabase /create:", JSON.stringify(supabaseData, null, 2));
+
+      // 3. Save to Supabase via backend API
+      const response = await adminFetch('/api/admin/products/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(supabaseData)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Supabase API Create Error (Raw):", errorText);
+        let errorData;
+        try { errorData = JSON.parse(errorText); } catch(e) { errorData = { message: errorText }; }
+        throw new Error(errorData.message || `Backend Error (${response.status})`);
       }
       
-      return docRef.id;
-    } catch (error) {
+      console.log("[Service] Supabase sync successful");
+      return firebaseId;
+    } catch (error: any) {
+      console.error("[Service] Product Create ERROR:", error);
       handleFirestoreError(error, OperationType.CREATE, path);
+      throw error;
     }
   },
 
   async update(id: string, productData: any) {
     const path = `products/${id}`;
     try {
+      // 1. Update Firebase
+      console.log(`[Service] Updating Firebase for ${id}...`);
       const docRef = doc(db, 'products', id);
       await updateDoc(docRef, {
         ...productData,
         updatedAt: serverTimestamp()
       });
+      console.log("[Service] Firebase update successful");
 
-      // Sync with Supabase table
-      try {
-        const { supabase } = await import('./supabaseClient');
-        await supabase.from('products').update({
-          ...productData,
-          updated_at: new Date().toISOString()
-        }).eq('id', id);
-      } catch (e) {
-        console.warn("Supabase Sync Failed:", e);
+      // 2. Prepare data for Supabase
+      const supabaseData = this.mapProductDataForSupabase(id, productData);
+
+      console.log(`[Service] Sending to Supabase /update/${id}:`, JSON.stringify(supabaseData, null, 2));
+
+      // 3. Update Supabase via backend API
+      const response = await adminFetch(`/api/admin/products/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(supabaseData)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try { errorData = JSON.parse(errorText); } catch(e) { errorData = { message: errorText }; }
+        console.error("Supabase API Update Error (Full):", errorData);
+        throw new Error(errorData.message || `Backend Error (${response.status}): ${errorText.slice(0, 100)}`);
       }
-    } catch (error) {
+      
+      console.log("[Service] Supabase update successful");
+      return true;
+    } catch (error: any) {
+      console.error("[Service] Product Update CRITICAL ERROR:", error);
       handleFirestoreError(error, OperationType.UPDATE, path);
+      throw error;
     }
+  },
+
+  // Helper to map data correctly for Supabase (matching database schema)
+  mapProductDataForSupabase(id: string, productData: any) {
+    // Handle tags: convert comma-separated string to array if needed
+    let tagsList = productData.tags || [];
+    if (typeof tagsList === 'string' && tagsList.trim()) {
+      tagsList = tagsList.split(',').map((t: string) => t.trim()).filter(Boolean);
+    } else if (typeof tagsList === 'string') {
+      tagsList = [];
+    }
+
+    // IMPORTANT: Postgres columns are lowercase unless quoted. 
+    // The schema file uses camelCase without quotes, so we MUST map to lowercase keys
+    // to match what Postgres actually creates in the database.
+    return {
+      id,
+      name: productData.name,
+      slug: productData.slug,
+      sku: productData.sku,
+      description: productData.description,
+      price: productData.price !== undefined ? parseFloat(productData.price || 0) : undefined,
+      discountprice: productData.discountPrice !== undefined ? (productData.discountPrice ? parseFloat(productData.discountPrice) : null) : undefined,
+      tax: productData.tax !== undefined ? parseFloat(productData.tax || 0) : undefined,
+      category: productData.category || productData.category_id,
+      subcategory: productData.subCategory,
+      brand: productData.brand,
+      tags: tagsList,
+      stock: productData.stock !== undefined ? parseInt(productData.stock || 0) : undefined,
+      lowstockalert: productData.lowStockAlert !== undefined ? parseInt(productData.lowStockAlert || 5) : undefined,
+      status: productData.status || 'active',
+      video_url: productData.video_url || '',
+      featured: productData.featured !== undefined ? !!productData.featured : undefined,
+      bestseller: productData.bestSeller !== undefined ? !!productData.bestSeller : undefined,
+      newarrival: productData.newArrival !== undefined ? !!productData.newArrival : undefined,
+      image: productData.image || productData.main_image,
+      gallery: productData.gallery || productData.gallery_images || [],
+      variants: productData.variants || [],
+      sizes: productData.sizes || [],
+      colors: productData.colors || [],
+      weight: productData.weight || '',
+      dimensions: productData.dimensions || null,
+      shippingclass: productData.shippingClass || 'Standard',
+      metatitle: productData.metaTitle || '',
+      metadescription: productData.metaDescription || '',
+      keywords: productData.keywords || '',
+      fabric_type: productData.fabric_type || '',
+      gsm: productData.gsm || '',
+      fit_type: productData.fit_type || '',
+      wash_instruction: productData.wash_instruction || '',
+      material: productData.material || '',
+      stretch_type: productData.stretch_type || '',
+      country: productData.country || '',
+      stitch_quality: productData.stitch_quality || '',
+      rating: productData.rating !== undefined ? parseFloat(productData.rating || 5.0) : undefined,
+      sold: productData.sold !== undefined ? parseInt(productData.sold || 0) : undefined,
+      updated_at: new Date().toISOString()
+    };
   },
 
   async delete(id: string) {
     const path = `products/${id}`;
     try {
+      // 1. Delete from Firebase
       await deleteDoc(doc(db, 'products', id));
       
-      // Sync with Supabase table
-      try {
-        const { supabase } = await import('./supabaseClient');
-        await supabase.from('products').delete().eq('id', id);
-      } catch (e) {
-        console.warn("Supabase Sync Failed:", e);
+      // 2. Delete from Supabase via backend API
+      const response = await adminFetch(`/api/admin/products/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Supabase API Delete Error:", errorData);
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, path);
@@ -441,12 +542,13 @@ export const categoryService = {
       // Sync with Supabase table
       try {
         const { supabase } = await import('./supabaseClient');
-        await supabase.from('categories').insert([{
+        const { error: syncError } = await supabase.from('categories').insert([{
           name,
           banner_image: image || '',
           slug: name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, ''),
           created_at: new Date().toISOString()
         }]);
+        if (syncError) console.warn("Supabase Sync Warning:", syncError.message);
       } catch (e) {
         console.warn("Supabase Sync Failed:", e);
       }
@@ -484,13 +586,19 @@ export const bannerService = {
         // Sync with Supabase table
         try {
             const { supabase } = await import('./supabaseClient');
-            await supabase.from('banners').upsert({
+            const { error: syncError } = await supabase.from('banners').upsert({
                 title: data.title || type,
                 banner_url: data.banner_url || data.image_url || data.image,
                 type: data.type || type,
                 is_active: true,
                 created_at: new Date().toISOString()
             });
+            if (syncError) {
+                console.warn("Supabase Sync Warning:", syncError.message);
+                if (syncError.message.includes('row-level security policy')) {
+                    console.warn("Please add an INSERT/UPDATE policy for the 'banners' table in Supabase.");
+                }
+            }
         } catch (e) {
             console.warn("Supabase Sync Failed:", e);
         }

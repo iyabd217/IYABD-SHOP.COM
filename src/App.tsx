@@ -148,6 +148,9 @@ const AdminProtectedRoute = ({ children, isAdmin }: { children: any; isAdmin: bo
 // --- Loading Component ---
 const PageLoader = () => {
   const [showReload, setShowReload] = useState(false);
+  const { settings } = useSettings();
+  const fallbackLogo = cmsService.getAssetUrl('website-assets', 'logos/main-logo.png');
+  const logo = settings?.logo || fallbackLogo || '/default-logo.webp';
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -165,11 +168,11 @@ const PageLoader = () => {
          <motion.div 
            animate={{ scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] }}
            transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-           className="w-24 h-24 mb-6 rounded-[24px] bg-white shadow-[0_0_40px_rgba(147,51,234,0.3)] flex items-center justify-center overflow-hidden"
+           className="w-24 h-24 mb-6 rounded-[24px] bg-white text-center shadow-[0_0_40px_rgba(147,51,234,0.3)] flex items-center justify-center overflow-hidden p-2"
          >
            <img 
-             src={cmsService.getAssetUrl('website-assets', 'logos/logo.png')} 
-             alt="IYABD" 
+             src={logo} 
+             alt="Logo" 
              className="w-full h-full object-contain"
              onError={(e) => {
                e.currentTarget.style.display = 'none';
@@ -1844,9 +1847,9 @@ const Layout = ({ children, user }: { children: any, user: any }) => {
 
             <Link to="/" className="header-logo-wrapper">
               <img
-                 src={settings.logo}
+                 src={settings.logo || '/default-logo.webp'}
                  alt="logo"
-                 className="header-logo"
+                 className="site-logo"
               />
             </Link>
         </div>
@@ -4878,6 +4881,7 @@ const AppRoutes = () => {
   );
 };
 
+import { Toaster } from 'react-hot-toast';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const queryClient = new QueryClient({
@@ -4895,11 +4899,12 @@ export default function App() {
       <HelmetProvider>
           <AuthProvider>
             <CartProvider>
+              <Toaster position="top-right" />
               <PopupManager />
               <WishlistProvider>
                 <div className="app-wrapper">
                   <LayoutWrapper>
-                    <Suspense fallback={null}>
+                    <Suspense fallback={<PageLoader />}>
                        <AppRoutes />
                     </Suspense>
                   </LayoutWrapper>

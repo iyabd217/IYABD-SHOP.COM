@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { Camera, Save, X, Image as ImageIcon } from 'lucide-react';
 import { useSettings } from '../../context/SettingsContext';
+import toast from 'react-hot-toast';
+import { adminFetch } from '../../lib/utils';
 
 const ShopSettings: React.FC = () => {
     const { settings, setSettings } = useSettings();
@@ -9,69 +11,187 @@ const ShopSettings: React.FC = () => {
     const bannerDesktopInputRef = useRef<HTMLInputElement>(null);
     const [saved, setSaved] = useState(false);
 
+    const [loading, setLoading] = useState(false);
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'logo' | 'bannerDesktop' | 'bannerMobile') => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
             if (field === 'logo') {
-                // Immediately update local preview URL to give fast feedback
+                if (file.size > 2 * 1024 * 1024) {
+                    toast.error("Maximum File Size 2MB");
+                    return;
+                }
+                const validTypes = ['image/png', 'image/webp', 'image/svg+xml'];
+                if (!validTypes.includes(file.type)) {
+                    toast.error("Only PNG, WEBP, SVG Allowed");
+                    return;
+                }
+                
                 const objectUrl = URL.createObjectURL(file);
-                setLocalSettings(prev => ({ ...prev, logo: objectUrl, _logoFile: file } as any));
-            } else {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    setLocalSettings(prev => ({ ...prev, [field]: event.target?.result as string }));
+                const img = new Image();
+                img.onload = () => {
+                    if (img.width < 500 || img.height < 200) {
+                        toast.error("Please Upload Proper Website Logo\nRecommended Size 500×200 PX");
+                        URL.revokeObjectURL(objectUrl);
+                        return;
+                    }
+                    setLocalSettings(prev => ({ ...prev, logo: objectUrl, _logoFile: file } as any));
                 };
-                reader.readAsDataURL(file);
+                img.src = objectUrl;
+            } else {
+                const objectUrl = URL.createObjectURL(file);
+                setLocalSettings(prev => ({ ...prev, [field]: objectUrl, [`_${field}File`]: file } as any));
             }
         }
     };
 
-    const handleSave = async () => {
+    const handleRemoveLogo = async () => {
         try {
-            let finalLogoUrl = localSettings.logo;
+            setLoading(true);
             
-            // If they picked a new logo file
-            const file = (localSettings as any)._logoFile;
-            if (file) {
+            // Delete DB URL via server API
+            try {
+                const response = await fetch('/api/admin/website-settings/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ logo_url: '' }),
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || "DB update failed");
+                }
+            } catch (err: any) {
+                console.warn("DB update failed:", err);
+            }
+
+            // Clear Firestore if possible
+            const { adminService } = await import('../../lib/adminServices');
+            try {
+               await adminService.updateCompanySettings({ website_logo: '', logo: '' });
+            } catch(e) {}
+
+            localStorage.removeItem("website_logo");
+            setLocalSettings(prev => ({ ...prev, logo: '', _logoFile: null } as any));
+            setSettings(prev => ({ ...prev, logo: '' }));
+            
+            window.dispatchEvent(new Event('storage'));
+            window.dispatchEvent(new Event('logo-updated'));
+            toast.success("Logo Removed Successfully");
+        } catch (e) {
+            toast.error("Remove Failed");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSave = async () => {
+        if (loading) return;
+        
+        try {
+            setLoading(true);
+            setSaved(false);
+
+            const logoFile = (localSettings as any)._logoFile;
+            const bannerDesktopFile = (localSettings as any)._bannerDesktopFile;
+            const bannerMobileFile = (localSettings as any)._bannerMobileFile;
+
+            let updatedUrls: any = {};
+
+            // 1. Upload files first
+            if (logoFile || bannerDesktopFile || bannerMobileFile) {
                 const formData = new FormData();
-                formData.append('logo', file);
-                
-                const res = await fetch('/api/settings/logo', {
+                if (logoFile) formData.append('logo', logoFile);
+                if (bannerDesktopFile) formData.append('banner_desktop', bannerDesktopFile);
+                if (bannerMobileFile) formData.append('banner_mobile', bannerMobileFile);
+
+                const uploadRes = await adminFetch('/api/admin/website-media/upload', {
                     method: 'POST',
                     body: formData
                 });
-                
-                if (res.ok) {
-                    const data = await res.json();
-                    finalLogoUrl = data.url;
+
+                const contentType = uploadRes.headers.get('content-type');
+
+                if (uploadRes.ok && contentType?.includes('application/json')) {
+                    updatedUrls = await uploadRes.json();
+                } else {
+                    const text = await uploadRes.text();
+                    console.error(`Media upload failed with status ${uploadRes.status}:`, text.slice(0, 500));
+                    
+                    if (text.startsWith('<!doctype') || text.startsWith('<html')) {
+                        throw new Error(`Server returned HTML instead of JSON (error ${uploadRes.status}). Please check server logs.`);
+                    }
+                    throw new Error(`Media upload failed (${uploadRes.status}): ${text || 'Unknown error'}`);
                 }
             }
 
-            const { adminService } = await import('../../lib/adminServices');
-            // Try updating Firestore if they are logged in. 
-            // We'll wrap it in try/catch so to ignore permissions error smoothly
-            try {
-               await adminService.updateCompanySettings({ website_logo: finalLogoUrl, logo: finalLogoUrl, bannerDesktop: localSettings.bannerDesktop, bannerTitle: localSettings.bannerTitle, bannerSubtitle: localSettings.bannerSubtitle });
-            } catch(firebaseErr) {
-               console.warn("Could not save to firestore, maybe insufficient permissions. Logo is already saved to Cloud Storage.");
+            // 2. Build final DB payload (Aligned with requested schema)
+            const dbPayload: any = {
+                website_name: localSettings.companyName || 'IYABD',
+                contact_email: localSettings.email,
+                contact_phone: localSettings.contact,
+                address: localSettings.address,
+                whatsapp: localSettings.whatsapp,
+                bkash: localSettings.bkash,
+                banner_title: localSettings.bannerTitle,
+                banner_subtitle: localSettings.bannerSubtitle,
+                updated_at: new Date().toISOString()
+            };
+
+            if (updatedUrls.logo_url) dbPayload.logo_url = updatedUrls.logo_url;
+            if (updatedUrls.banner_desktop) dbPayload.banner_desktop = updatedUrls.banner_desktop;
+            if (updatedUrls.banner_mobile) dbPayload.banner_mobile = updatedUrls.banner_mobile;
+
+            // 3. Save to Supabase DB via server API
+            const settingsResponse = await adminFetch('/api/admin/website-settings/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dbPayload)
+            });
+
+            if (!settingsResponse.ok) {
+                const errData = await settingsResponse.json();
+                throw new Error(errData.error || "Settings update failed");
             }
+
+            // 5. Update local state and global settings
+            const finalLogo = updatedUrls.logo_url || settings.logo;
+            const logoWithCache = finalLogo.includes('?') ? `${finalLogo.split('?')[0]}?v=${Date.now()}` : `${finalLogo}?v=${Date.now()}`;
             
-            if (finalLogoUrl) {
-                localStorage.setItem("website_logo", finalLogoUrl);
-                setSettings(prev => ({ ...prev, ...localSettings, logo: finalLogoUrl }));
-                setLocalSettings(prev => ({ ...prev, logo: finalLogoUrl, _logoFile: null } as any));
-            } else {
-                localStorage.removeItem("website_logo");
-                setSettings(localSettings);
+            const newSettings = {
+                ...settings,
+                logo: logoWithCache,
+                siteLogo: logoWithCache,
+                website_logo: logoWithCache,
+                bannerDesktop: updatedUrls.banner_desktop || settings.bannerDesktop,
+                bannerMobile: updatedUrls.banner_mobile || settings.bannerMobile,
+                bannerTitle: dbPayload.banner_title,
+                bannerSubtitle: dbPayload.banner_subtitle
+            } as any;
+
+            setLocalSettings(newSettings);
+            setSettings(newSettings);
+
+            if (updatedUrls.logo_url) {
+                localStorage.setItem("website_logo", logoWithCache);
+                window.dispatchEvent(new Event("logo-updated"));
             }
-            // Trigger a dispatch to update the site logo dynamically across all tabs/hooks
+
+            toast.success("✅ Settings Saved Successfully");
+            setSaved(true);
+            
+            // Re-trigger global refresh
             window.dispatchEvent(new Event('storage'));
-        } catch (e) {
-            console.error(e);
-            setSettings(localSettings);
+            
+            setTimeout(() => setSaved(false), 3000);
+
+        } catch (error: any) {
+            console.error("Save Error:", error);
+            toast.error(error.message || "Save Failed");
+        } finally {
+            setLoading(false);
         }
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
     };
 
     return (
@@ -89,17 +209,35 @@ const ShopSettings: React.FC = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-6">
-                    <input type="file" accept="image/png, image/webp, image/svg+xml, image/jpeg" hidden ref={logoInputRef} onChange={(e) => handleFileChange(e, 'logo')} />
+                    <input type="file" accept="image/png, image/webp, image/svg+xml" hidden ref={logoInputRef} onChange={(e) => handleFileChange(e, 'logo')} />
                     <div className="space-y-2 shrink-0">
-                        <div onClick={() => logoInputRef.current?.click()} className="w-[160px] h-[160px] rounded-[32px] bg-[#F3F4F6] border-2 border-dashed border-[#CBD5E1] flex items-center justify-center cursor-pointer hover:border-[#2563EB] transition-all overflow-hidden">
-                            {localSettings.logo ? <img src={localSettings.logo} className="w-full h-full object-contain" /> : <Camera size={48} className="text-slate-400" />}
+                        <div onClick={() => logoInputRef.current?.click()} className="logo-upload-box cursor-pointer hover:border-[#2563EB] transition-all">
+                            {localSettings.logo ? <img src={localSettings.logo} className="logo-preview" /> : <Camera size={24} className="text-slate-400" />}
                         </div>
                         <p className="text-center text-xs font-bold text-slate-500">Best Logo Ratio: 5:2</p>
                     </div>
                     <div className="space-y-2">
                         <button onClick={() => logoInputRef.current?.click()} className="px-6 py-3 bg-slate-100 rounded-2xl text-sm font-bold hover:bg-slate-200">Change Logo</button>
-                        <button onClick={() => setLocalSettings(prev => ({...prev, logo: ''}))} className="px-6 py-3 text-red-500 text-sm font-bold">Remove Logo</button>
+                        <button onClick={handleRemoveLogo} disabled={loading} className="px-6 py-3 text-red-500 text-sm font-bold disabled:opacity-50">Remove Logo</button>
                     </div>
+                </div>
+                
+                <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-100">
+                    <button 
+                        onClick={() => {
+                            setLocalSettings(settings);
+                        }}
+                        className="px-6 flex items-center justify-center bg-[#F1F3F9] text-[#111827] h-[56px] rounded-[18px] font-bold"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        onClick={handleSave}
+                        disabled={loading}
+                        className={`save-btn ${saved ? 'saved' : ''}`}
+                    >
+                        {loading ? 'Saving...' : saved ? '✔ Saved' : 'Save Changes'}
+                    </button>
                 </div>
             </div>
 
@@ -120,14 +258,6 @@ const ShopSettings: React.FC = () => {
                 </div>
             </div>
 
-            {/* Footer Sticky Save Bar */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 p-4 flex justify-between items-center z-[9990]">
-                <p className="text-xs font-bold text-slate-400">{saved ? '✅ Logo Updated Successfully' : 'Unsaved changes pending...'}</p>
-                <div className="flex gap-4">
-                    <button className="px-8 py-4 bg-slate-100 rounded-2xl text-sm font-bold">Cancel</button>
-                    <button onClick={handleSave} className="px-8 py-4 bg-[#081028] text-white rounded-2xl text-sm font-bold flex items-center gap-2 shadow-lg"><Save size={16} /> Save Changes</button>
-                </div>
-            </div>
         </div>
     );
 };

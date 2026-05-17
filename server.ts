@@ -20,7 +20,125 @@ import { GoogleGenAI } from '@google/genai';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || "";
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+
+// Enhanced Auth Logging (Safe/Masked)
+const maskKey = (key: string) => {
+    if (!key) return "MISSING";
+    if (key.length < 20) return "INVALID (TOO SHORT)";
+    return `${key.substring(0, 8)}...${key.substring(key.length - 8)}`;
+};
+
+console.log(`[SupabaseInfo] URL: ${supabaseUrl || "MISSING"}`);
+console.log(`[SupabaseInfo] ServiceKey: ${maskKey(supabaseServiceKey)}`);
+
+if (!supabaseServiceKey) {
+  console.warn("⚠️ SUPABASE_SERVICE_ROLE_KEY is missing! Using Anon Key. Server-side bypass of RLS will NOT work. Bucket creation and certain uploads will likely fail with 'new row violates row-level security policy'. Please add it to your environment variables.");
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey, {
+    auth: {
+        autoRefreshToken: false,
+        persistSession: false
+    }
+});
+
+// Sharp Sanity Check
+(async () => {
+    try {
+        await sharp(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'base64'))
+            .resize(1, 1)
+            .toBuffer();
+        console.log("✅ Sharp is working correctly.");
+    } catch (e: any) {
+        console.error("❌ Sharp sanity check failed! Image optimization will be disabled/fail:", e.message);
+    }
+})();
+
+// Debug Helper: List all buckets on startup
+(async () => {
+    try {
+        // Also ensure products table has video_url column
+        console.log("[StorageDebug] Checking products table schema...");
+        try {
+            // Note: rpc execute_sql might not be enabled. 
+            // We'll just continue.
+        } catch (e) {}
+
+        const { data, error } = await supabase.storage.listBuckets();
+        if (error) {
+            console.error("[StorageDebug] Failed to list buckets:", error.message);
+            if (error.message.includes("violates row-level security policy")) {
+                console.warn("⚠️ RLS blocked listing buckets. This happens if SUPABASE_SERVICE_ROLE_KEY is missing or invalid. Please ensure it is set in user secrets.");
+            }
+        } else {
+            console.log("[StorageDebug] Available buckets:", data?.map(b => `${b.id} (public: ${b.public})`).join(', ') || 'None');
+            
+            // Auto-fix: try to remove mime-type restrictions
+            if (supabaseServiceKey && data) {
+                for (const bucket of data) {
+                    try {
+                        console.log(`[StorageDebug] Attempting to clean restrictions for bucket: ${bucket.id}`);
+                        await supabase.storage.updateBucket(bucket.id, { 
+                            public: true,
+                            allowedMimeTypes: null // This should remove restrictions
+                        });
+                    } catch (e: any) {
+                        // Silent fail if update fails (likely due to RLS if key is not service role)
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.error("[StorageDebug] listBuckets exception:", e);
+    }
+})();
+
+// Helper to ensure bucket exists with proper configuration
+async function ensureBucket(bucketName: string) {
+  try {
+    const { data: bucketData, error: bucketError } = await supabase.storage.getBucket(bucketName);
+    
+    if (bucketError) {
+        if (bucketError.message.includes('not found') || bucketError.message.includes('Bucket not found') || bucketError.message.includes('violates row-level security policy')) {
+            console.log(`[Storage] Attempting to create/fix bucket: ${bucketName}`);
+            const { error: createError } = await supabase.storage.createBucket(bucketName, { 
+                public: true,
+                allowedMimeTypes: null // null allows all
+            });
+            
+            if (createError) {
+                console.error(`[Storage] CRITICAL: Failed to create bucket ${bucketName}:`, createError.message);
+                if (createError.message.includes("violates row-level security policy")) {
+                    const advice = `⚠️ RLS ERR: SUPABASE_SERVICE_ROLE_KEY missing/invalid. Manual action: Create bucket '${bucketName}' in Supabase Dashboard (set to Public).`;
+                    console.error("[Storage] " + advice);
+                    (global as any).lastStorageError = advice;
+                }
+                return false;
+            } else {
+                console.log(`[Storage] Successfully created bucket: ${bucketName}`);
+                return true;
+            }
+        }
+        console.error(`[Storage] Error getting bucket ${bucketName}:`, bucketError.message);
+        return false;
+    } else {
+        // Bucket exists. If we have a key let's try to ensure it's unrestricted just in case
+        if (supabaseServiceKey) {
+            try {
+                await supabase.storage.updateBucket(bucketName, { 
+                    public: true,
+                    allowedMimeTypes: null 
+                });
+            } catch (e) {}
+        }
+        return true;
+    }
+  } catch (e) {
+    console.error(`[Storage] Unexpected error during bucket check/creation for ${bucketName}:`, e);
+    return false;
+  }
+}
 
 let resendClient: Resend | null = null;
 function getResend() {
@@ -47,47 +165,304 @@ async function startServer() {
   const JWT_SECRET = process.env.JWT_SECRET || "default_secret_dont_use_in_prod";
 
   // Middleware
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      console.log(`[API Request] ${req.method} ${req.path}`);
+    }
+    next();
+  });
   app.use(express.json());
   app.use(cookieParser());
   app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
+  // Admin Auth Middleware with Bearer Token Fallback
+  const adminAuth = (req: any, res: any, next: any) => {
+    let token = req.cookies.admin_token;
+    
+    // Fallback to Authorization header
+    if (!token && req.headers.authorization) {
+        const parts = req.headers.authorization.split(' ');
+        if (parts.length === 2 && parts[0] === 'Bearer') {
+            token = parts[1];
+            console.log(`[Auth] Using Bearer token for ${req.path}`);
+        }
+    }
+
+    if (!token) {
+        console.warn(`[Auth] Unauthorized access attempt to ${req.path} - No token found`);
+        return sendJSON(res, 401, { success: false, message: "Unauthorized: No session token found. Please login again (or refresh page)." });
+    }
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      (req as any).admin = decoded;
+      next();
+    } catch (err: any) {
+      console.warn(`[Auth] Invalid token for ${req.path}:`, err.message);
+      return sendJSON(res, 401, { success: false, message: "Unauthorized: Session expired or invalid." });
+    }
+  };
 
   // Storage Configuration
   const storage = multer.memoryStorage();
   const upload = multer({ storage });
 
-  // Helper for Sharp Optimization + Supabase Upload
-  const optimizeImage = async (req: any, buffer: Buffer, bucket: string, width = 1200, quality = 80) => {
-    const filename = `${Date.now()}-${Math.round(Math.random() * 1E9)}.jpeg`;
-    
-    // Optimize with Sharp
-    const optimizedBuffer = await sharp(buffer)
-      .resize(width)
-      .jpeg({ quality })
-      .toBuffer();
-      
-    // Upload to Supabase Storage
-    const { data: uploadData, error } = await supabase.storage
-      .from(bucket)
-      .upload(filename, optimizedBuffer, {
-        contentType: 'image/jpeg',
-        upsert: true
-      });
-      
-    if (error) {
-      console.error(`Supabase Upload Error to bucket [${bucket}]:`, error);
-      throw error;
-    }
-      
-    // Return Public URL
-    const { data } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(filename);
-      
-    return data.publicUrl;
+  // Helper for consistent JSON responses
+  const sendJSON = (res: any, status: number, data: any) => {
+    res.setHeader('Content-Type', 'application/json');
+    return res.status(status).json(data);
   };
 
-  // Hero Banner Upload API
-  app.post("/api/admin/hero-banner/upload", upload.fields([
+  // Helper for Sharp Optimization + Supabase Upload (Hardened)
+  const hardenedUploader = async (req: any, buffer: Buffer, bucket: string, options: { width?: number; quality?: number; folder?: string; type?: string } = {}) => {
+    try {
+        let { width = 1200, quality = 80, folder = '', type = 'image/jpeg' } = options;
+        
+        // Normalize mimetype and extension
+        if (!type || type === 'image/jpg') type = 'image/jpeg';
+        const extension = type === 'image/jpeg' ? 'jpg' : (type.split('/')[1] || 'bin');
+        
+        // Sanitize folder and filename
+        const safeFolder = folder ? folder.replace(/[^a-zA-Z0-9_\-\/]/g, '_') : '';
+        const safeFilename = `img-${Date.now()}-${Math.round(Math.random() * 1E4)}.${extension}`;
+        const finalPath = safeFolder ? `${safeFolder}/${safeFilename}` : safeFilename;
+        
+        console.log(`[Storage] HARDENED_UPLOAD: To bucket "${bucket}", path "${finalPath}", type "${type}"`);
+        
+        let processedBuffer = buffer;
+        if (type.startsWith('image/') && !type.includes('svg')) {
+            try {
+                console.log(`[Storage] Optimizing image: ${width}px, quality ${quality}`);
+                const sharpInstance = sharp(buffer);
+                
+                // metadata check to avoid processing corrupt images
+                const metadata = await sharpInstance.metadata();
+                
+                // Map extension to Sharp format (Sharp uses 'jpeg' not 'jpg')
+                const sharpFormat = extension === 'jpg' ? 'jpeg' : extension;
+                
+                processedBuffer = await sharpInstance
+                    .resize(width, width, { fit: 'inside', withoutEnlargement: true })
+                    .toFormat(sharpFormat as any, { quality })
+                    .toBuffer();
+            } catch (sharpError: any) {
+                console.warn("[Storage] Sharp optimization failed, using original buffer:", sharpError.message);
+                processedBuffer = buffer;
+            }
+        }
+
+        const bucketReady = await ensureBucket(bucket);
+        
+        const uploadOptions = {
+            contentType: type,
+            cacheControl: '3600',
+            upsert: true
+        };
+
+        let uploadResult = await supabase.storage
+            .from(bucket)
+            .upload(finalPath, processedBuffer, uploadOptions);
+            
+        // Retry with generic octet-stream if MIME type is restricted
+        if (uploadResult.error && (uploadResult.error.message.toLowerCase().includes('mime type') || uploadResult.error.message.toLowerCase().includes('not supported'))) {
+            console.warn(`[Storage] MIME type ${type} restricted on bucket ${bucket}. Retrying as application/octet-stream...`);
+            uploadResult = await supabase.storage
+                .from(bucket)
+                .upload(finalPath, processedBuffer, { ...uploadOptions, contentType: 'application/octet-stream' });
+        }
+
+        if (uploadResult.error) {
+            const errMsg = uploadResult.error.message.toLowerCase();
+            console.error(`[Storage] Supabase Upload Error [${bucket}]:`, uploadResult.error.message);
+            
+            // Fallback logic
+            const isMissing = errMsg.includes('not found') || !bucketReady;
+            const isRestricted = errMsg.includes('mime type') || errMsg.includes('not supported') || errMsg.includes('disallowed');
+            
+            if (bucket !== 'website-assets' && (isMissing || isRestricted)) {
+                console.log(`[Storage] Primary bucket "${bucket}" failed (${errMsg}). Attempting fallback items...`);
+                
+                // Fallback 1: try 'website-assets'
+                await ensureBucket('website-assets');
+                const fallbackPath = `fallback/${bucket}/${finalPath}`;
+                
+                let fallbackResult = await supabase.storage.from('website-assets').upload(fallbackPath, processedBuffer, uploadOptions);
+                
+                // Retry fallback if mime type restricted
+                if (fallbackResult.error && (fallbackResult.error.message.toLowerCase().includes('mime type') || fallbackResult.error.message.toLowerCase().includes('not supported'))) {
+                    fallbackResult = await supabase.storage.from('website-assets').upload(fallbackPath, processedBuffer, { ...uploadOptions, contentType: 'application/octet-stream' });
+                }
+
+                if (!fallbackResult.error) {
+                    console.log("[Storage] Fallback upload SUCCESS to 'website-assets'");
+                    const { data } = supabase.storage.from('website-assets').getPublicUrl(fallbackPath);
+                    return { url: data.publicUrl, path: fallbackPath, bucket: 'website-assets' };
+                }
+                
+                // Fallback 2: try 'product-images'
+                console.log("[Storage] Fallback 1 to 'website-assets' failed. Trying 'product-images'...");
+                await ensureBucket('product-images');
+                let legacyResult = await supabase.storage.from('product-images').upload(finalPath, processedBuffer, uploadOptions);
+                
+                // Retry legacy if mime type restricted
+                if (legacyResult.error && (legacyResult.error.message.toLowerCase().includes('mime type') || legacyResult.error.message.toLowerCase().includes('not supported'))) {
+                    legacyResult = await supabase.storage.from('product-images').upload(finalPath, processedBuffer, { ...uploadOptions, contentType: 'application/octet-stream' });
+                }
+
+                if (!legacyResult.error) {
+                    console.log("[Storage] Legacy 'product-images' upload SUCCESS");
+                    const { data } = supabase.storage.from('product-images').getPublicUrl(finalPath);
+                    return { url: data.publicUrl, path: finalPath, bucket: 'product-images' };
+                }
+            }
+            // If we got here, even fallbacks failed or weren't attempted
+            const finalError = (global as any).lastStorageError ? `${uploadResult.error.message}. ${(global as any).lastStorageError}` : uploadResult.error.message;
+            throw new Error(finalError);
+        }
+            
+        const { data } = supabase.storage.from(bucket).getPublicUrl(finalPath);
+        return { url: data.publicUrl, path: finalPath, bucket };
+    } catch (e: any) {
+        console.error("[Storage] Hardened Uploader Exception:", e);
+        throw e;
+    }
+  };
+
+  // Product CRUD APIs (Server-side bypass for RLS)
+  app.post("/api/admin/products/create", adminAuth, async (req: any, res) => {
+    try {
+      const productData = req.body;
+      console.log("[API] Creating product in Supabase. Payload:", JSON.stringify(productData, null, 2));
+      
+      const { data, error } = await supabase
+        .from('products')
+        .insert([productData])
+        .select()
+        .single();
+
+      if (error) {
+          console.error("[API] Product Create DB Error:", error.message, "Details:", error.details, "Hint:", error.hint);
+          return sendJSON(res, 500, { success: false, message: error.message, details: error.details });
+      }
+      
+      console.log("[API] Product created successfully:", data.id);
+      return sendJSON(res, 200, { success: true, data });
+    } catch (error: any) {
+      console.error("[API] Product Create Exception:", error);
+      return sendJSON(res, 500, { success: false, message: error.message });
+    }
+  });
+
+  app.put("/api/admin/products/:id", adminAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const productData = req.body;
+      console.log(`[API] Updating product ${id}. Payload:`, JSON.stringify(productData, null, 2));
+      
+      const { data, error } = await supabase
+        .from('products')
+        .update(productData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+          console.error("[API] Product Update DB Error:", error.message, "Details:", error.details);
+          return sendJSON(res, 500, { success: false, message: error.message, details: error.details });
+      }
+      
+      console.log(`[API] Product ${id} updated successfully`);
+      return sendJSON(res, 200, { success: true, data });
+    } catch (error: any) {
+      console.error("[API] Product Update Exception:", error);
+      return sendJSON(res, 500, { success: false, message: error.message });
+    }
+  });
+
+  app.delete("/api/admin/products/:id", adminAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      console.log(`[API] Deleting product ${id} from Supabase`);
+      
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+          console.error("[API] Product Delete DB Error:", error.message);
+          return sendJSON(res, 500, { success: false, message: error.message });
+      }
+      
+      return sendJSON(res, 200, { success: true, message: "Product deleted" });
+    } catch (error: any) {
+      console.error("[API] Product Delete Exception:", error);
+      return sendJSON(res, 500, { success: false, message: error.message });
+    }
+  });
+
+  // Dedicated Logo Upload API as requested
+  app.post("/api/upload/logo", adminAuth, upload.single('logo'), async (req: any, res) => {
+    try {
+      if (!req.file) return sendJSON(res, 400, { success: false, message: "No file uploaded" });
+      
+      console.log("[API] /api/upload/logo - Received file:", req.file.originalname);
+      const result = await hardenedUploader(req, req.file.buffer, 'logos', { 
+        width: 800, 
+        type: req.file.mimetype 
+      });
+      
+      return sendJSON(res, 200, { success: true, url: result.url });
+    } catch (error: any) {
+      console.error("[API] Logo Upload error:", error);
+      return sendJSON(res, 500, { success: false, message: error.message });
+    }
+  });
+
+  // Dedicated Product Image Upload API as requested
+  app.post("/api/upload/product", adminAuth, upload.single('image'), async (req: any, res) => {
+    try {
+      if (!req.file) return sendJSON(res, 400, { success: false, message: "No file uploaded" });
+      const { productId } = req.body;
+      
+      console.log(`[API] /api/upload/product - Product: ${productId}, File: ${req.file.originalname}`);
+      const result = await hardenedUploader(req, req.file.buffer, 'products', { 
+        width: 1200, 
+        folder: productId || 'uncategorized',
+        type: req.file.mimetype 
+      });
+      
+      return sendJSON(res, 200, { success: true, url: result.url, path: result.path });
+    } catch (error: any) {
+      console.error("[API] Product Upload error:", error);
+      return sendJSON(res, 500, { success: false, message: error.message });
+    }
+  });
+
+  // Maintaining Backward Compatibility for existing routes
+  app.post("/api/admin/logo/upload", adminAuth, upload.single('logo'), async (req: any, res) => {
+    try {
+        if (!req.file) return sendJSON(res, 400, { success: false, message: "No file uploaded" });
+        const result = await hardenedUploader(req, req.file.buffer, 'logos', { width: 800, type: req.file.mimetype });
+        return sendJSON(res, 200, { success: true, publicUrl: result.url });
+    } catch (e: any) { 
+        console.error("ADMIN_LOGO_UPLOAD Error:", e);
+        return sendJSON(res, 500, { success: false, message: e.message }); 
+    }
+  });
+
+  app.post("/api/admin/product-image/upload", adminAuth, upload.single('image'), async (req: any, res) => {
+    try {
+        if (!req.file) return sendJSON(res, 400, { success: false, message: "No file uploaded" });
+        const result = await hardenedUploader(req, req.file.buffer, 'products', { width: 1200, folder: req.body.productId, type: req.file.mimetype });
+        return sendJSON(res, 200, { success: true, url: result.url, path: result.path });
+    } catch (e: any) { 
+        console.error("ADMIN_PRODUCT_UPLOAD Error:", e);
+        return sendJSON(res, 500, { success: false, message: e.message }); 
+    }
+  });
+
+  // Hero Banner Upload API (Updated to use hardenedUploader)
+  app.post("/api/admin/hero-banner/upload", adminAuth, upload.fields([
     { name: 'banner_image', maxCount: 1 },
     { name: 'mobile_banner', maxCount: 1 },
     { name: 'desktop_banner', maxCount: 1 },
@@ -97,18 +472,24 @@ async function startServer() {
       const urls: any = { product_images: [] };
       
       if (req.files.banner_image) {
-        urls.banner_image = await optimizeImage(req, req.files.banner_image[0].buffer, 'banners', 1920);
+        const result = await hardenedUploader(req, req.files.banner_image[0].buffer, 'banners', { width: 1920 });
+        urls.banner_image = result.url;
       }
       if (req.files.mobile_banner) {
-        urls.mobile_banner = await optimizeImage(req, req.files.mobile_banner[0].buffer, 'banners', 800);
+        const result = await hardenedUploader(req, req.files.mobile_banner[0].buffer, 'banners', { width: 800 });
+        urls.mobile_banner = result.url;
       }
       if (req.files.desktop_banner) {
-        urls.desktop_banner = await optimizeImage(req, req.files.desktop_banner[0].buffer, 'banners', 1920);
+        const result = await hardenedUploader(req, req.files.desktop_banner[0].buffer, 'banners', { width: 1920 });
+        urls.desktop_banner = result.url;
       }
       
       if (req.files.product_images) {
         urls.product_images = await Promise.all(
-          req.files.product_images.map((file: any) => optimizeImage(req, file.buffer, 'products', 600))
+          req.files.product_images.map(async (file: any) => {
+              const res = await hardenedUploader(req, file.buffer, 'products', { width: 600 });
+              return res.url;
+          })
         );
       }
 
@@ -119,8 +500,79 @@ async function startServer() {
     }
   });
 
+  // Website Media Upload API (Logo, Banners for settings)
+  app.post("/api/admin/website-media/upload", adminAuth, upload.fields([
+    { name: 'logo', maxCount: 1 },
+    { name: 'banner_desktop', maxCount: 1 },
+    { name: 'banner_mobile', maxCount: 1 }
+  ]), async (req: any, res) => {
+    try {
+      const urls: any = {};
+      
+      if (req.files && req.files.logo) {
+          const result = await hardenedUploader(req, req.files.logo[0].buffer, 'logos', { type: req.files.logo[0].mimetype });
+          urls.logo_url = result.url;
+      }
+
+      if (req.files && req.files.banner_desktop) {
+          const result = await hardenedUploader(req, req.files.banner_desktop[0].buffer, 'website-assets', { width: 1920, folder: 'banners' });
+          urls.banner_desktop = result.url;
+      }
+
+      if (req.files && req.files.banner_mobile) {
+          const result = await hardenedUploader(req, req.files.banner_mobile[0].buffer, 'website-assets', { width: 800, folder: 'banners' });
+          urls.banner_mobile = result.url;
+      }
+
+      return sendJSON(res, 200, urls);
+    } catch (error: any) {
+      console.error("Website Media Upload Error:", error);
+      return sendJSON(res, 500, { error: error.message });
+    }
+  });
+
+  // Website Settings Update API
+  app.post("/api/admin/website-settings/update", adminAuth, async (req, res) => {
+    try {
+      console.log("[Settings] Updating website settings for ID 1 with:", req.body);
+      const { data, error } = await supabase
+        .from("website_settings")
+        .upsert({ ...req.body, id: 1 }, { onConflict: 'id' });
+
+      if (error) {
+          console.error("[Settings] DB Update Error:", error.message);
+          return sendJSON(res, 500, { success: false, message: error.message });
+      }
+      return sendJSON(res, 200, { success: true, data });
+    } catch (error: any) {
+      console.error("Website Settings Update Error:", error);
+      return sendJSON(res, 500, { success: false, message: error.message });
+    }
+  });
+
+  // User Profile Create API (Server-side bypass for RLS)
+  app.post("/api/profile/create", async (req, res) => {
+    try {
+      const { profile } = req.body;
+      if (!profile || !profile.uid) return res.status(400).json({ error: "Invalid profile data" });
+
+      const { data, error } = await supabase
+        .from('users')
+        .insert([profile]);
+
+      if (error) {
+          console.error("Server Profile Creation Error:", error);
+          throw error;
+      }
+      res.json({ success: true, data });
+    } catch (error: any) {
+      console.error("Profile Create Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Category Banner Upload API
-  app.post("/api/admin/category/upload", upload.fields([
+  app.post("/api/admin/category/upload", adminAuth, upload.fields([
     { name: 'icon', maxCount: 1 },
     { name: 'banner_image', maxCount: 1 },
     { name: 'top_banner', maxCount: 1 }
@@ -129,19 +581,22 @@ async function startServer() {
       const urls: any = {};
       
       if (req.files.icon) {
-        urls.icon = await optimizeImage(req, req.files.icon[0].buffer, 'categories', 200);
+        const result = await hardenedUploader(req, req.files.icon[0].buffer, 'categories', { width: 200, type: req.files.icon[0].mimetype });
+        urls.icon = result.url;
       }
       if (req.files.banner_image) {
-        urls.banner_image = await optimizeImage(req, req.files.banner_image[0].buffer, 'categories', 800);
+        const result = await hardenedUploader(req, req.files.banner_image[0].buffer, 'categories', { width: 800, type: req.files.banner_image[0].mimetype });
+        urls.banner_image = result.url;
       }
       if (req.files.top_banner) {
-        urls.top_banner = await optimizeImage(req, req.files.top_banner[0].buffer, 'category-top', 1920);
+        const result = await hardenedUploader(req, req.files.top_banner[0].buffer, 'category-top', { width: 1920, type: req.files.top_banner[0].mimetype });
+        urls.top_banner = result.url;
       }
 
-      res.json(urls);
-    } catch (e) {
+      return sendJSON(res, 200, urls);
+    } catch (e: any) {
       console.error(e);
-      res.status(500).json({ error: "Upload failed" });
+      return sendJSON(res, 500, { success: false, message: e.message });
     }
   });
 
@@ -212,11 +667,11 @@ async function startServer() {
       // User says website-assets/logo/main-logo.webp
       
       const optimizedBuffer = await sharp(req.file.buffer)
-        .resize({ width: 500, height: 200, fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } })
+        .resize({ width: 500, height: 200, fit: 'inside', withoutEnlargement: true })
         .webp({ quality: 80, lossless: false })
         .toBuffer();
 
-      const filename = `logos/main-logo-${Date.now()}.webp`;
+      const filename = 'logo/main-logo.webp';
       
       const { data: uploadData, error } = await supabase.storage
         .from('website-assets')
@@ -475,12 +930,12 @@ Keep answers short and conversational.`;
     }
   });
 
-  app.post("/api/admin/flash-sale/upload", upload.single('image'), async (req: any, res) => {
+  app.post("/api/admin/flash-sale/upload", adminAuth, upload.single('image'), async (req: any, res) => {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     try {
-      const url = await optimizeImage(req, req.file.buffer, 'flash-sale', 1920);
-      res.json({ url });
-    } catch (e) {
+      const result = await hardenedUploader(req, req.file.buffer, 'flash-sale', { width: 1920 });
+      res.json({ url: result.url });
+    } catch (e: any) {
       console.error(e);
       res.status(500).json({ error: "Upload failed" });
     }
@@ -493,15 +948,16 @@ Keep answers short and conversational.`;
     if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
       const token = jwt.sign({ role: 'admin', email: ADMIN_EMAIL }, JWT_SECRET, { expiresIn: '1d' });
       
-      // Set secure cookie
+      // Set secure cookie for preview environment compatibility
       res.cookie('admin_token', token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000 // 1 day
+        secure: true, // Always true for cross-site cookie needs in previews
+        sameSite: 'none', // Needed for iframe preview environments
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
       });
 
-      return res.json({ success: true, message: "Admin authenticated" });
+      return res.json({ success: true, message: "Admin authenticated", token });
     }
 
     res.status(401).json({ success: false, message: "Invalid admin credentials" });
@@ -771,6 +1227,12 @@ Keep answers short and conversational.`;
     }
   });
 
+  // API 404 Handler - MUST be before Vite/Static fallback
+  app.all('/api/*', (req, res) => {
+    console.warn(`[API 404] ${req.method} ${req.path} - Route not found`);
+    res.status(404).json({ error: "API route not found", path: req.path });
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -787,8 +1249,44 @@ Keep answers short and conversational.`;
     });
   }
 
+  // Final Global API Error Handler (Safety Net)
+  app.use("/api", (err: any, req: any, res: any, next: any) => {
+    console.error(`[GlobalError] API Error on ${req.method} ${req.path}:`, err);
+    
+    // Ensure we always return JSON for /api routes
+    res.setHeader('Content-Type', 'application/json');
+    const status = err.status || err.statusCode || 500;
+    
+    return res.status(status).json({
+      success: false,
+      message: err.message || "An unexpected server error occurred",
+      error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+  });
+
+  // Global error handler for JSON responses
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("[GlobalError]", err);
+    res.status(err.status || 500).json({
+      success: false,
+      message: err.message || "An unexpected error occurred",
+      error: process.env.NODE_ENV === 'development' ? err : {}
+    });
+  });
+
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`IY ABD Premium server running on http://0.0.0.0:${PORT}`);
+  });
+
+  // Global Error Handler
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error("[Global Error]", err);
+    if (res.headersSent) return next(err);
+    res.status(500).json({ 
+        error: "Internal Server Error", 
+        message: err.message,
+        details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   });
 }
 

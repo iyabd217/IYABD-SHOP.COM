@@ -23,7 +23,8 @@ export const STORAGE_BUCKETS = {
   siteSettings: 'site-settings',
   websiteConfig: 'website-config',
   telegramConfig: 'telegram-config',
-  websiteAssets: 'website-assets'
+  websiteAssets: 'website-assets',
+  logos: 'logos'
 };
 
 export const supabaseStorageService = {

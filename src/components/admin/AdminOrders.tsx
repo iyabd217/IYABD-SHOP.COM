@@ -6,13 +6,14 @@ import { Invoice } from '../checkout/Invoice';
 import { formatDistanceToNow, isToday, isYesterday } from 'date-fns';
 import { db } from '../../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { useSettings } from '../../context/SettingsContext';
 
 const AdminOrders = () => {
     const [orders, setOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedOrder, setSelectedOrder] = useState<any>(null);
     const [viewMode, setViewMode] = useState<'edit' | 'invoice' | null>(null);
-    const [companySettings, setCompanySettings] = useState<any>({});
+    const { settings: companySettings } = useSettings();
     
     // Filters & Bulk
     const [searchQuery, setSearchQuery] = useState('');
@@ -23,7 +24,6 @@ const AdminOrders = () => {
 
     useEffect(() => {
         fetchData();
-        adminService.getCompanySettings().then(settings => setCompanySettings(settings || {}));
     }, []);
 
     const fetchData = () => {

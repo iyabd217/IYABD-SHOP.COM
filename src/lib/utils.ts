@@ -47,6 +47,26 @@ export const optimizeImg = (url: string, options: { width?: number; height?: num
   return url;
 };
 
+export async function adminFetch(url: string, options: RequestInit = {}) {
+  const token = localStorage.getItem('admin_token');
+  console.log(`[adminFetch] ${options.method || 'GET'} ${url}`, { 
+    hasToken: !!token,
+    body: options.body ? (options.body.toString().length > 100 ? options.body.toString().slice(0, 100) + '...' : options.body) : 'no body'
+  });
+  
+  const headers = new Headers(options.headers || {});
+  
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  
+  return fetch(url, {
+    ...options,
+    headers,
+    credentials: 'include'
+  });
+}
+
 export const translations = {
   en: {
     shop: "Shop",

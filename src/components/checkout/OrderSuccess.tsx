@@ -5,17 +5,19 @@ import { Invoice } from './Invoice';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
+import { useSettings } from '../../context/SettingsContext';
 
 export default function OrderSuccess(props: { order?: any, orderItems?: any[], companySettings?: any }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { settings: currentSettings } = useSettings();
   const [isGenerating, setIsGenerating] = useState(false);
   const [readyToPrint, setReadyToPrint] = useState(false);
   
   // Read from location state if available (when navigating via router), otherwise try props
   const order = location.state?.order || props.order;
   const orderItems = location.state?.orderItems || props.orderItems || [];
-  const companySettings = location.state?.companySettings || props.companySettings || {};
+  const companySettings = currentSettings || location.state?.companySettings || props.companySettings || {};
 
   useEffect(() => {
     // Adding a short delay guarantees fonts and components are fully mounted 

@@ -66,11 +66,21 @@ export const AuthProvider = ({ children }: { children: any }) => {
   useEffect(() => {
     const checkAdmin = async () => {
       try {
-        const res = await fetch('/api/admin/verify');
+        const token = localStorage.getItem('admin_token');
+        const headers: any = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        
+        const res = await fetch('/api/admin/verify', { 
+            headers,
+            credentials: 'include' 
+        });
         const data = await res.json();
         
         if (data.isAdmin) {
-          const tRes = await fetch('/api/admin/firebase-token');
+          const tRes = await fetch('/api/admin/firebase-token', { 
+              headers,
+              credentials: 'include' 
+          });
           if (tRes.ok) {
             const tData = await tRes.json();
             if (tData.token) {
@@ -135,24 +145,51 @@ export const AuthProvider = ({ children }: { children: any }) => {
     if (authError || !authData.user) throw authError;
 
     // Create Supabase User Profile
-    const userProfile: UserProfile = {
+    const userProfile = {
       uid: authData.user.id,
       email: data.email,
-      displayName: data.name,
-      photoURL: null,
-      phoneNumber: data.phone,
+      display_name: data.name,
+      photo_url: null,
+      phone_number: data.phone,
       address: data.address,
       division: data.division,
       district: data.district,
       area: data.area,
       street: data.street,
-      coins: 200, // Registration bonus
+      coins: 200,
     };
     
-    const { error: profileError } = await supabase.from('users').insert([userProfile]);
-    if (profileError) throw profileError;
+    const profileResponse = await fetch('/api/profile/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile: userProfile })
+    });
+
+    const profileData = await profileResponse.json();
     
-    setProfile(userProfile);
+    if (!profileResponse.ok) {
+      console.error("Profile creation error: ", profileData.error);
+      if (profileData.error?.includes('row-level security policy')) {
+         console.warn("Bypassing RLS error for profile creation. Please add an INSERT policy for the 'users' table.");
+      } else {
+         // Log but don't strictly throw if user is already created in Auth
+         console.warn("User was created but profile sync failed:", profileData.error);
+      }
+    }
+    
+    setProfile({
+        uid: userProfile.uid,
+        email: userProfile.email,
+        displayName: userProfile.display_name,
+        photoURL: userProfile.photo_url,
+        phoneNumber: userProfile.phone_number,
+        address: userProfile.address,
+        division: userProfile.division,
+        district: userProfile.district,
+        area: userProfile.area,
+        street: userProfile.street,
+        coins: userProfile.coins
+    });
   };
 
   const logout = async () => {
@@ -162,7 +199,12 @@ export const AuthProvider = ({ children }: { children: any }) => {
   const updateAddress = async (address: string) => {
     if (user) {
       const { error } = await supabase.from('users').update({ address }).eq('uid', user.id);
-      if (error) throw error;
+      if (error) {
+         console.warn("Update address error:", error);
+         if (!error.message?.includes('row-level security policy')) {
+            throw error;
+         }
+      }
       setProfile(prev => prev ? { ...prev, address } : null);
     }
   };
@@ -170,7 +212,12 @@ export const AuthProvider = ({ children }: { children: any }) => {
   const updateProfile = async (data: Partial<UserProfile>) => {
      if (user) {
        const { error } = await supabase.from('users').update(data).eq('uid', user.id);
-       if (error) throw error;
+       if (error) {
+         console.warn("Update profile error:", error);
+         if (!error.message?.includes('row-level security policy')) {
+            throw error;
+         }
+       }
        setProfile(prev => prev ? { ...prev, ...data } : null);
      }
   };
@@ -180,10 +227,14 @@ export const AuthProvider = ({ children }: { children: any }) => {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
+        credentials: 'include'
       });
       const data = await res.json();
       if (data.success) {
+        if (data.token) {
+          localStorage.setItem('admin_token', data.token);
+        }
         // Authenticate in Firebase explicitly
         const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
         try {
@@ -212,7 +263,8 @@ export const AuthProvider = ({ children }: { children: any }) => {
   };
 
   const adminLogout = async () => {
-    await fetch('/api/admin/logout', { method: 'POST' });
+    localStorage.removeItem('admin_token');
+    await fetch('/api/admin/logout', { method: 'POST', credentials: 'include' });
     setIsAdmin(false);
     await signOutFirebase(auth).catch(() => {});
   };

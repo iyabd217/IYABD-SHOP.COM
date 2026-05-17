@@ -11,6 +11,14 @@ export const Invoice = ({ order, orderItems, companySettings }: { order: any, or
       {/* STICKER COURIER BARCODE (Only visible if tracking_id exists) */}
       {(order?.tracking_id || order?.trackingId) && (
         <div className="mb-4 flex flex-col items-center justify-center border-b-2 border-black pb-4 text-center">
+            {/* Courier Sticker Print Logo */}
+            {companySettings?.siteLogo || companySettings?.logo || companySettings?.website_logo ? (
+              <img 
+                src={companySettings.siteLogo || companySettings.logo || companySettings.website_logo} 
+                alt="Company Logo" 
+                className="sticker-logo mb-2 hidden print:block"
+              />
+            ) : null}
             <h2 className="text-[12px] font-black uppercase tracking-widest text-slate-800 mb-1">{order.courier_name || order.courierName || 'Courier Partner'}</h2>
             <Barcode 
               value={order.tracking_id || order.trackingId} 
@@ -27,11 +35,11 @@ export const Invoice = ({ order, orderItems, companySettings }: { order: any, or
       <div className="flex flex-row justify-between items-start mb-3">
         {/* LEFT SIDE: Logo & Address */}
         <div className="text-left flex flex-col items-start max-w-[50%]">
-          {companySettings?.siteLogo || companySettings?.logo ? (
+          {companySettings?.siteLogo || companySettings?.logo || companySettings?.website_logo ? (
             <img 
-              src={companySettings.siteLogo || companySettings.logo} 
+              src={companySettings.siteLogo || companySettings.logo || companySettings.website_logo} 
               alt="Company Logo" 
-              className="max-h-12 object-contain mb-1.5"
+              className="invoice-logo mb-1.5"
             />
           ) : (
             <div className="text-2xl font-black tracking-tighter uppercase whitespace-nowrap mb-1.5">
